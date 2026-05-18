@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import ProjectListPage from './pages/ProjectListPage'
 import ProjectDashboard from './pages/ProjectDashboard'
@@ -13,10 +13,17 @@ export default function App() {
       <Routes>
         <Route path="/" element={<ProjectListPage />} />
         <Route path="/project/:id" element={<ProjectDashboard />} />
-        <Route path="/project/:id/chat" element={<ChatPage />} />
         <Route path="/project/:id/write" element={<WritePage />} />
         <Route path="/project/:id/read" element={<ReadPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+
+        {/* Planning modules */}
+        <Route path="/project/:id/chat" element={<Navigate to="world" replace />} />
+        <Route path="/project/:id/world" element={<ChatPage mode="world" />} />
+        <Route path="/project/:id/characters" element={<ChatPage mode="characters" />} />
+        <Route path="/project/:id/plot" element={<ChatPage mode="plot" />} />
+        <Route path="/project/:id/outline" element={<ChatPage mode="outline" />} />
+        <Route path="/project/:id/revision" element={<ChatPage mode="revision" />} />
       </Routes>
     </Layout>
   )

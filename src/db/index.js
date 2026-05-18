@@ -2,11 +2,11 @@ import Dexie from 'dexie'
 
 const db = new Dexie('StoryGenerater')
 
-db.version(3).stores({
+db.version(4).stores({
   projects: '++id, title, status, createdAt',
   characters: '++id, projectId, name',
   chapters: '++id, projectId, number, status',
-  conversations: '++id, projectId, phase',
+  conversations: '++id, projectId, mode',
   settings: 'key',
   chapter_summaries: '++id, chapterId',
   plot_arcs: '++id, projectId, type, status',
@@ -97,15 +97,15 @@ export async function deleteChapter(id) {
 
 // ====== Conversations ======
 
-export async function getProjectConversation(projectId) {
+export async function getProjectConversation(projectId, mode) {
   return await db.conversations
-    .where({ projectId: Number(projectId) })
+    .where({ projectId: Number(projectId), mode })
     .first()
 }
 
-export async function saveProjectConversation(projectId, messages) {
+export async function saveProjectConversation(projectId, mode, messages) {
   const existing = await db.conversations
-    .where({ projectId: Number(projectId) })
+    .where({ projectId: Number(projectId), mode })
     .first()
 
   if (existing) {
@@ -117,9 +117,14 @@ export async function saveProjectConversation(projectId, messages) {
   }
   return await db.conversations.add({
     projectId: Number(projectId),
+    mode,
     messages,
     createdAt: Date.now(),
   })
+}
+
+export async function deleteProjectConversations(projectId) {
+  await db.conversations.where({ projectId: Number(projectId) }).delete()
 }
 
 // ====== Settings ======

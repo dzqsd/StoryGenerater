@@ -106,11 +106,23 @@ export default function ProjectDashboard() {
         </button>
         <h1 className="page-title" style={{ margin: 0 }}>{project.title}</h1>
         <div className="btn-group" style={{ margin: 0 }}>
-          <button className="btn btn-primary btn-sm" onClick={() => navigate(`/project/${id}/chat`)}>
-            💬 进入对话
+          <button className="btn btn-primary btn-sm" onClick={() => navigate(`/project/${id}/world`)}>
+            🌍 世界观
+          </button>
+          <button className="btn btn-primary btn-sm" onClick={() => navigate(`/project/${id}/characters`)}>
+            👤 人物
+          </button>
+          <button className="btn btn-primary btn-sm" onClick={() => navigate(`/project/${id}/plot`)}>
+            📜 剧情
+          </button>
+          <button className="btn btn-primary btn-sm" onClick={() => navigate(`/project/${id}/outline`)}>
+            📑 大纲
+          </button>
+          <button className="btn btn-primary btn-sm" onClick={() => navigate(`/project/${id}/revision`)}>
+            ✏️ 修订
           </button>
           <button className="btn btn-primary btn-sm" onClick={() => navigate(`/project/${id}/write`)}>
-            ✍️ 进入写作
+            ✍️ 写作
           </button>
           <button className="btn btn-secondary btn-sm" onClick={handleExport} disabled={chapters.every((c) => !c.content)}>
             📥 导出 TXT
