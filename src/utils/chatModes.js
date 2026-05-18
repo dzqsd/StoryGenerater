@@ -29,6 +29,8 @@ export const CHAT_MODES = {
 - 用中文交流，不用 markdown 格式
 - 当用户已确定题材和世界观方向后，在回复末尾加上 [SETTING:已确认]，帮助系统记录
 
+现在开始对话。先自我介绍（你是世界观设计师），然后问用户想写什么题材，用 [OPTIONS] 提供选项。
+
 ====== 当前项目状态 ======
 - 标题：${project.title || '未定'}
 - 题材：${project.genre || '未定'}
@@ -37,7 +39,7 @@ export const CHAT_MODES = {
 ====== 已有人物 ======
 ${charBlock}`
     },
-    openingMessage: '你好，我是你的世界观设计师。让我们一起来构建你的故事世界。\n\n首先，你想写什么题材的小说？',
+    openingMessage: '',
     dataExtractor: (content, project) => {
       const updates = {}
       // Extract genre
@@ -89,9 +91,11 @@ ${charBlock}
 - 每个角色独立标签块，不要合并
 - 需要选择时用 [OPTIONS]...[/OPTIONS] 提供选项
 - 不要涉及剧情规划，那有专门的入口
-- 用中文交流，不用 markdown 格式`
+- 用中文交流，不用 markdown 格式
+
+现在开始对话。先自我介绍（你是人物设计师），然后请用户描述主角的姓名和特点。`
     },
-    openingMessage: '你好，我是你的人物设计师。让我们来塑造你的角色。\n\n先从主角开始——他/她叫什么名字？有什么特点？',
+    openingMessage: '',
     dataExtractor: () => null,
     extractCharacters: true,
   },
@@ -128,9 +132,9 @@ ${charBlock}
 - 不要在这里规划具体章节大纲，那有专门的入口
 - 用中文交流，不用 markdown 格式
 
-现在，基于已有的人物和世界设定，为用户规划主线剧情。`
+现在开始对话。先自我介绍（你是剧情策划师），然后基于已有设定提供2-3条主线方向供用户选择，用 [OPTIONS] 呈现。`
     },
-    openingMessage: '你好，我是你的剧情策划师。现在我来帮你梳理故事的主线。\n\n基于你已有的人物和世界设定，我提供几个主线方向供你参考：',
+    openingMessage: '',
     dataExtractor: () => null,
     extractSynopsis: true,
   },
@@ -180,9 +184,9 @@ ${chapterList}
 - 用中文交流，不用 markdown 格式
 - 需要修改调整时，重新输出完整的 [CHAPTERS] 标签
 
-现在，基于主线剧情，帮用户规划章节结构。`
+现在开始对话。先自我介绍（你是章节规划师），然后基于主线概要提出章节安排方案，列出 [CHAPTERS]。`
     },
-    openingMessage: '你好，我是你的章节规划师。现在我们来规划具体的章节结构。\n\n基于主线剧情，我建议以下章节安排：',
+    openingMessage: '',
     dataExtractor: () => null,
     extractChapters: true,
   },
@@ -223,9 +227,9 @@ ${chapterList}
 - 基于现有设定，不另创世界观和人物
 - 用中文交流，不用 markdown 格式
 
-请先问用户想修改哪一章。`
+现在开始对话。先自我介绍（你是小说编辑），然后问用户想修改哪一章。`
     },
-    openingMessage: '你好，我是你的小说编辑。哪一章需要修改？告诉我具体的问题，我帮你优化。',
+    openingMessage: '',
     dataExtractor: () => null,
   },
 }

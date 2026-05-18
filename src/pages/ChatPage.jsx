@@ -155,7 +155,7 @@ export default function ChatPage({ mode: propMode }) {
     const systemPrompt = modeConfig.systemPrompt(p || projectRef.current, chars || [], chaps || [])
     const msgs = [
       { role: 'system', content: systemPrompt },
-      { role: 'user', content: modeConfig.openingMessage },
+      { role: 'user', content: '你好，我们开始吧。' },
     ]
 
     setMessages(msgs)
