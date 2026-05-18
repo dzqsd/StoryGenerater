@@ -6,7 +6,7 @@
  * Each line inside is one option (stripped of leading bullet/number).
  */
 
-const OPTIONS_RE = /\[OPTIONS\]([\s\S]*?)\[\/OPTIONS\]/g
+const OPTIONS_RE = /\[OPTIONS\]([\s\S]*?)\[\/OPTIONS\]/
 
 export function parseAIMessage(content) {
   const options = []

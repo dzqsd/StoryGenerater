@@ -19,11 +19,11 @@ export default function App() {
 
         {/* Planning modules */}
         <Route path="/project/:id/chat" element={<Navigate to="../world" replace />} />
-        <Route path="/project/:id/world" element={<ChatPage mode="world" />} />
-        <Route path="/project/:id/characters" element={<ChatPage mode="characters" />} />
-        <Route path="/project/:id/plot" element={<ChatPage mode="plot" />} />
-        <Route path="/project/:id/outline" element={<ChatPage mode="outline" />} />
-        <Route path="/project/:id/revision" element={<ChatPage mode="revision" />} />
+        <Route path="/project/:id/world" element={<ChatPage key="world" mode="world" />} />
+        <Route path="/project/:id/characters" element={<ChatPage key="characters" mode="characters" />} />
+        <Route path="/project/:id/plot" element={<ChatPage key="plot" mode="plot" />} />
+        <Route path="/project/:id/outline" element={<ChatPage key="outline" mode="outline" />} />
+        <Route path="/project/:id/revision" element={<ChatPage key="revision" mode="revision" />} />
       </Routes>
     </Layout>
   )
