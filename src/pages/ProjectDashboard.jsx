@@ -4,6 +4,7 @@ import {
   getProject, updateProject, deleteProject,
   getCharactersByProject, getChaptersByProject,
   saveCharacter, saveChapter, deleteCharacter, deleteChapter,
+  getPlotArcsByProject, updatePlotArcStatus, deletePlotArc,
 } from '../db'
 import CharacterCard from '../components/CharacterCard'
 import ChapterItem from '../components/ChapterItem'
@@ -14,6 +15,7 @@ export default function ProjectDashboard() {
   const [project, setProject] = useState(null)
   const [characters, setCharacters] = useState([])
   const [chapters, setChapters] = useState([])
+  const [plotArcs, setPlotArcs] = useState([])
   const [tab, setTab] = useState('overview')
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState({})
@@ -28,6 +30,7 @@ export default function ProjectDashboard() {
     setProject(p)
     setCharacters(await getCharactersByProject(id))
     setChapters(await getChaptersByProject(id))
+    setPlotArcs(await getPlotArcsByProject(id))
   }
 
   useEffect(() => { load() }, [id, navigate])
@@ -182,6 +185,60 @@ export default function ProjectDashboard() {
             <div className="storyline-synopsis">
               <div style={{ fontSize: 12, color: '#e94560', fontWeight: 700, marginBottom: 8 }}>📜 主线概要</div>
               {project.synopsis}
+            </div>
+          )}
+
+          {plotArcs.length > 0 && (
+            <div className="card" style={{ marginBottom: 20 }}>
+              <h3 style={{ fontSize: 14, marginBottom: 12, color: '#e94560' }}>📌 伏笔与冲突追踪</h3>
+              {plotArcs.map((arc) => (
+                <div
+                  key={arc.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '6px 0',
+                    borderBottom: '1px solid #1a1a2e',
+                    fontSize: 13,
+                  }}
+                >
+                  <span style={{
+                    fontSize: 10,
+                    padding: '2px 6px',
+                    borderRadius: 4,
+                    background: arc.type === 'foreshadowing' ? '#0f3460' : arc.type === 'conflict' ? '#533483' : '#1a8a4a',
+                    color: '#ccc',
+                    flexShrink: 0,
+                  }}>
+                    {arc.type === 'foreshadowing' ? '伏笔' : arc.type === 'conflict' ? '冲突' : '角色弧'}
+                  </span>
+                  <span style={{ flex: 1 }}>{arc.description}</span>
+                  <span className={`chapter-status ${arc.status === 'open' ? 'status-planned' : 'status-done'}`} style={{ fontSize: 10 }}>
+                    {arc.status === 'open' ? '未解决' : '已解决'}
+                  </span>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={async () => {
+                      await updatePlotArcStatus(arc.id, arc.status === 'open' ? 'resolved' : 'open')
+                      load()
+                    }}
+                    style={{ fontSize: 10, padding: '2px 6px' }}
+                  >
+                    {arc.status === 'open' ? '标记解决' : '重新打开'}
+                  </button>
+                  <button
+                    className="btn btn-danger btn-sm"
+                    onClick={async () => {
+                      await deletePlotArc(arc.id)
+                      load()
+                    }}
+                    style={{ fontSize: 10, padding: '2px 6px' }}
+                  >
+                    删
+                  </button>
+                </div>
+              ))}
             </div>
           )}
 
