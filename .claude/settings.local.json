@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create *)",
+      "Bash(npm --version)",
+      "Bash(npm install *)",
+      "Bash(npx vite *)",
+      "Bash(curl -s http://localhost:5173)",
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(npm run *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173/)",
+      "Bash(start *)",
+      "Bash(curl *)",
+      "Bash(node test-coherence.js)",
+      "Bash(node -e ' *)",
+      "WebSearch",
+      "Bash(npx claude-superskills *)",
+      "Bash(npm list *)",
+      "Bash(npm search *)",
+      "Bash(winget install *)",
+      "Bash(scoop install *)"
+    ]
+  }
+}
