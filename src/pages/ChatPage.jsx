@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import {
+import db, {
   getProject, updateProject,
   getCharactersByProject, getChaptersByProject,
   getProjectConversation, saveProjectConversation,
   getSetting, saveCharacter, saveChapter,
+  savePlotArc,
 } from '../db'
 import { streamChat } from '../api/deepseek'
 import ChatMessage from '../components/ChatMessage'
@@ -397,6 +398,23 @@ export default function ChatPage() {
       } else {
         const newId = await saveCharacter({ projectId: Number(id), ...char })
         charArr.push({ id: newId, projectId: Number(id), ...char })
+
+        // Auto-extract character arc for characters with dramatic backgrounds
+        if (char.background && (char.background.includes('幸存') || char.background.includes('仇恨') || char.background.includes('秘密') || char.background.includes('封印') || char.background.includes('灭门') || char.background.includes('转世'))) {
+          const arcDesc = `${char.name}的角色弧光：${char.background}`
+          const arcExists = await db.plot_arcs
+            .where({ projectId: Number(id), description: arcDesc })
+            .first()
+          if (!arcExists) {
+            await savePlotArc({
+              projectId: Number(id),
+              type: 'character_arc',
+              description: arcDesc,
+              status: 'open',
+              relatedChapter: 0,
+            })
+          }
+        }
       }
     }
 
@@ -451,6 +469,33 @@ export default function ChatPage() {
           setProject((prev) => ({ ...prev, genre }))
           projectRef.current = { ...p, genre }
           break
+        }
+      }
+    }
+
+    // 6. Extract plot arcs from synopsis content
+    if (synopsis && synopsis.length > 50) {
+      const arcPatterns = [
+        { re: /复仇|报仇|灭门|血海深仇/, desc: '主线复仇线' },
+        { re: /阴谋|暗中|秘密|真相/, desc: '阴谋/真相线' },
+        { re: /魔神|上古|封印|转世/, desc: '神话/魔神线' },
+        { re: /叛徒|内鬼|出卖/, desc: '叛徒线' },
+        { re: /凤凰|血脉|觉醒/, desc: '血脉觉醒线' },
+      ]
+      for (const { re, desc } of arcPatterns) {
+        if (re.test(synopsis)) {
+          const existing = await db.plot_arcs
+            .where({ projectId: Number(id), description: desc })
+            .first()
+          if (!existing) {
+            await savePlotArc({
+              projectId: Number(id),
+              type: 'conflict',
+              description: desc,
+              status: 'open',
+              relatedChapter: 0,
+            })
+          }
         }
       }
     }
