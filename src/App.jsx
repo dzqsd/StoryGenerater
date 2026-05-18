@@ -18,7 +18,7 @@ export default function App() {
         <Route path="/settings" element={<SettingsPage />} />
 
         {/* Planning modules */}
-        <Route path="/project/:id/chat" element={<Navigate to="world" replace />} />
+        <Route path="/project/:id/chat" element={<Navigate to="../world" replace />} />
         <Route path="/project/:id/world" element={<ChatPage mode="world" />} />
         <Route path="/project/:id/characters" element={<ChatPage mode="characters" />} />
         <Route path="/project/:id/plot" element={<ChatPage mode="plot" />} />
