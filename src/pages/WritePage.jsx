@@ -434,7 +434,7 @@ export default function WritePage() {
                 className="form-input"
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                placeholder={generating ? 'AI 正在生成...' : '选择左侧章节，点击「生成」按钮让 AI 开始写作，或直接在此输入文本...'}
+                placeholder={pipeline.stage !== 'idle' && pipeline.stage !== 'done' ? 'AI 正在生成...' : '选择左侧章节，点击「流水线生成」按钮让 AI 开始写作，或直接在此输入文本...'}
                 style={{
                   flex: 1,
                   resize: 'none',
