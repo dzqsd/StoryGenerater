@@ -10,7 +10,7 @@ const projectNav = [
   { to: 'world', label: '世界观' },
   { to: 'characters', label: '人物' },
   { to: 'plot', label: '剧情' },
-  { to: 'outline', label: '大纲' },
+  { to: 'outline', label: '章节' },
   { to: 'revision', label: '修订' },
 ]
 

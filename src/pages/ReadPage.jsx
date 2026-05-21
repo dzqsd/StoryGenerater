@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { getProject, getChaptersByProject } from '../db'
 
 export default function ReadPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const topRef = useRef(null)
 
   const [project, setProject] = useState(null)
@@ -22,7 +23,7 @@ export default function ReadPage() {
       setChapters(chaps)
       if (chaps.length > 0) setCurrentIdx(0)
     })()
-  }, [id, navigate])
+  }, [id, location.key])
 
   const handleExportFull = () => {
     const full = chapters

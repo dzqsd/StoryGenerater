@@ -43,17 +43,22 @@ function extractChapters(content) {
   return match[1]
     .trim()
     .split('\n')
-    .map((line) => line.replace(/^\d+[.、)\s]+/, '').trim())
-    .filter(Boolean)
-    .map((line, i) => {
-      const sepMatch = line.match(/[-—–]\s*/)
-      let title = line
+    .map((line) => {
+      const numMatch = line.match(/^(\d+)[.、)\s]+/)
+      const number = numMatch ? parseInt(numMatch[1]) : 0
+      const cleanLine = line.replace(/^\d+[.、)\s]+/, '').trim()
+      return { number, cleanLine }
+    })
+    .filter((x) => x.cleanLine)
+    .map(({ number, cleanLine }, i) => {
+      const sepMatch = cleanLine.match(/[-—–]\s*/)
+      let title = cleanLine
       let summary = ''
       if (sepMatch) {
-        title = line.slice(0, sepMatch.index).trim()
-        summary = line.slice(sepMatch.index + sepMatch[0].length).trim()
+        title = cleanLine.slice(0, sepMatch.index).trim()
+        summary = cleanLine.slice(sepMatch.index + sepMatch[0].length).trim()
       }
-      return { number: i + 1, title, summary }
+      return { number: number || (i + 1), title, summary }
     })
 }
 
@@ -421,7 +426,7 @@ export default function ChatPage({ mode: propMode }) {
     { value: 'world', label: '世界观' },
     { value: 'characters', label: '人物' },
     { value: 'plot', label: '剧情' },
-    { value: 'outline', label: '大纲' },
+    { value: 'outline', label: '章节' },
     { value: 'revision', label: '修订' },
   ]
 

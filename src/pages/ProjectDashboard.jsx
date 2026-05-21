@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   getProject, updateProject, deleteProject,
@@ -31,7 +31,10 @@ export default function ProjectDashboard() {
   const [showTimeline, setShowTimeline] = useState(true)
   const [expandedChapterId, setExpandedChapterId] = useState(null)
   const [outlinePage, setOutlinePage] = useState(1)
-  const OUTLINE_PAGE_SIZE = 10
+  const [timelinePage, setTimelinePage] = useState(1)
+  const PAGE_SIZE = 6
+  const timelineJumpRef = useRef(null)
+  const outlineJumpRef = useRef(null)
 
   const load = async () => {
     const p = await getProject(id)
@@ -119,7 +122,7 @@ export default function ProjectDashboard() {
     { key: 'world', label: '世界观' },
     { key: 'characters', label: `人物 (${characters.length})` },
     { key: 'plot', label: `剧情 (${plotArcs.length})` },
-    { key: 'outline', label: `大纲 (${chapters.length})` },
+    { key: 'outline', label: `章节 (${chapters.length})` },
     { key: 'revision', label: '修订' },
   ]
 
@@ -145,7 +148,7 @@ export default function ProjectDashboard() {
           <button
             key={t.key}
             className={`dash-tab ${tab === t.key ? 'active' : ''}`}
-            onClick={() => { setTab(t.key); setOutlinePage(1); setExpandedChapterId(null) }}
+            onClick={() => { setTab(t.key); setOutlinePage(1); setTimelinePage(1); setExpandedChapterId(null) }}
           >
             {t.label}
           </button>
@@ -359,9 +362,13 @@ export default function ProjectDashboard() {
       {/* Outline Tab */}
       {tab === 'outline' && (() => {
         const sorted = [...chapters].sort((a, b) => a.number - b.number)
-        const totalPages = Math.max(1, Math.ceil(sorted.length / OUTLINE_PAGE_SIZE))
-        const startIdx = (outlinePage - 1) * OUTLINE_PAGE_SIZE
-        const pageChapters = sorted.slice(startIdx, startIdx + OUTLINE_PAGE_SIZE)
+        const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
+        const startIdx = (outlinePage - 1) * PAGE_SIZE
+        const pageChapters = sorted.slice(startIdx, startIdx + PAGE_SIZE)
+
+        const timelineTotalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
+        const timelineStartIdx = (timelinePage - 1) * PAGE_SIZE
+        const timelineChapters = sorted.slice(timelineStartIdx, timelineStartIdx + PAGE_SIZE)
 
         const toggleExpand = (chap) => {
           setExpandedChapterId((prev) => prev === chap.id ? null : chap.id)
@@ -379,7 +386,7 @@ export default function ProjectDashboard() {
               </div>
               {showTimeline && (
                 <div className="timeline" style={{ marginBottom: 24 }}>
-                  {sorted.map((c) => (
+                  {timelineChapters.map((c) => (
                     <div
                       key={c.id}
                       className={`timeline-node ${c.content ? 'written' : ''}`}
@@ -401,6 +408,59 @@ export default function ProjectDashboard() {
                       )}
                     </div>
                   ))}
+                  {timelineTotalPages > 1 && (
+                    <div className="pagination" style={{ marginTop: 12, marginBottom: 0 }}>
+                      <button
+                        className="pagination-btn"
+                        disabled={timelinePage <= 1}
+                        onClick={() => setTimelinePage((p) => Math.max(1, p - 1))}
+                      >
+                        ‹
+                      </button>
+                      {Array.from({ length: timelineTotalPages }, (_, i) => i + 1).map((p) => (
+                        <button
+                          key={p}
+                          className={`pagination-btn ${p === timelinePage ? 'active' : ''}`}
+                          onClick={() => setTimelinePage(p)}
+                        >
+                          {p}
+                        </button>
+                      ))}
+                      <button
+                        className="pagination-btn"
+                        disabled={timelinePage >= timelineTotalPages}
+                        onClick={() => setTimelinePage((p) => Math.min(timelineTotalPages, p + 1))}
+                      >
+                        ›
+                      </button>
+                      <input
+                        type="number"
+                        className="pagination-jump"
+                        min={1}
+                        max={timelineTotalPages}
+                        placeholder="跳转"
+                        ref={timelineJumpRef}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            const v = parseInt(e.target.value)
+                            if (v >= 1 && v <= timelineTotalPages) setTimelinePage(v)
+                            e.target.value = ''
+                          }
+                        }}
+                      />
+                      <button
+                        className="pagination-btn"
+                        onClick={() => {
+                          const input = timelineJumpRef.current
+                          const v = parseInt(input?.value)
+                          if (v >= 1 && v <= timelineTotalPages) setTimelinePage(v)
+                          if (input) input.value = ''
+                        }}
+                      >
+                        跳
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </>
@@ -441,7 +501,7 @@ export default function ProjectDashboard() {
 
           {chapters.length === 0 ? (
             <div className="empty-state" style={{ padding: 30 }}>
-              <p>还没有章节，去大纲策划对话中让 AI 帮你规划吧</p>
+              <p>还没有章节，去章节策划对话中让 AI 帮你规划吧</p>
             </div>
           ) : (
             <div>
@@ -516,6 +576,32 @@ export default function ProjectDashboard() {
                     onClick={() => setOutlinePage((p) => Math.min(totalPages, p + 1))}
                   >
                     ›
+                  </button>
+                  <input
+                    type="number"
+                    className="pagination-jump"
+                    min={1}
+                    max={totalPages}
+                    placeholder="跳转"
+                    ref={outlineJumpRef}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const v = parseInt(e.target.value)
+                        if (v >= 1 && v <= totalPages) setOutlinePage(v)
+                        e.target.value = ''
+                      }
+                    }}
+                  />
+                  <button
+                    className="pagination-btn"
+                    onClick={() => {
+                      const input = outlineJumpRef.current
+                      const v = parseInt(input?.value)
+                      if (v >= 1 && v <= totalPages) setOutlinePage(v)
+                      if (input) input.value = ''
+                    }}
+                  >
+                    跳
                   </button>
                   <span className="pagination-info">
                     共 {sorted.length} 章，{totalPages} 页

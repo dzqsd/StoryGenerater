@@ -1,0 +1,11 @@
+node_modules/
+dist/
+api.txt
+.env
+.env.local
+bash.exe.stackdump
+.claude/settings.local.json
+.claude/scheduled_tasks.json
+.idea/
+*.pyc
+__pycache__/

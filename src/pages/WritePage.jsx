@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
   getProject,
   getCharactersByProject,
@@ -14,6 +14,7 @@ import { runChapterPipeline, extractAndSaveSummary } from '../utils/chapterPipel
 export default function WritePage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const editorRef = useRef(null)
 
   const [project, setProject] = useState(null)
@@ -50,14 +51,6 @@ export default function WritePage() {
     final: '',
   })
   const pipelineRef = useRef({ abortFlag: false, controller: null })
-  const batchRef = useRef({ completed: [], failed: [] })
-
-  const [batch, setBatch] = useState({
-    active: false,
-    currentIndex: 0,
-    total: 0,
-  })
-  const [batchResult, setBatchResult] = useState(null)
 
   // Load data
   useEffect(() => {
@@ -81,9 +74,20 @@ export default function WritePage() {
         setContent(target.content || '')
       }
     })()
-  }, [id, navigate])
+  }, [id, location.key])
 
   const selected = chapters.find((c) => c.id === selectedId)
+  const chapterListRef = useRef(null)
+
+  // Auto-scroll chapter list to selected chapter
+  useEffect(() => {
+    if (selectedId && chapterListRef.current) {
+      const el = chapterListRef.current.querySelector(`[data-chapter-id="${selectedId}"]`)
+      if (el) {
+        el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+      }
+    }
+  }, [selectedId])
 
   const handleSelect = (chap) => {
     setSelectedId(chap.id)
@@ -146,124 +150,6 @@ export default function WritePage() {
     }
   }
 
-  const runBatchPipeline = async () => {
-    if (batch.active) return
-
-    const key = await getSetting('apiKey')
-    if (!key) {
-      setError('请先在设置页面配置 API Key')
-      return
-    }
-
-    const plannedChapters = chapters.filter((c) => c.status === 'planned')
-    if (plannedChapters.length === 0) {
-      setError('没有待生成的章节')
-      return
-    }
-
-    setError('')
-    setSavedMsg('')
-    setBatchResult(null)
-    pipelineRef.current.abortFlag = false
-    batchRef.current = { completed: [], failed: [] }
-
-    setBatch({
-      active: true,
-      currentIndex: 0,
-      total: plannedChapters.length,
-    })
-
-    const abortController = new AbortController()
-    pipelineRef.current.controller = abortController
-
-    // Pre-fetch static data
-    const chars = await getCharactersByProject(id)
-    const proj = await getProject(id)
-
-    for (let i = 0; i < plannedChapters.length; i++) {
-      if (pipelineRef.current.abortFlag || abortController.signal.aborted) break
-
-      const chapter = plannedChapters[i]
-      setSelectedId(chapter.id)
-      setContent('')
-      setPipeline({ stage: 'outline', outline: '', draft: '', review: '', final: '' })
-      setBatch((p) => ({ ...p, currentIndex: i }))
-
-      // Fetch per-chapter data (summary chain grows as chapters are saved)
-      let chaps, summaryChain, plotArcs
-      try {
-        ;[chaps, summaryChain, plotArcs] = await Promise.all([
-          getChaptersByProject(id),
-          getAllChapterSummaries(id),
-          getOpenPlotArcs(id),
-        ])
-      } catch (err) {
-        batchRef.current.failed.push({ number: chapter.number, title: chapter.title, error: '数据获取失败: ' + err.message })
-        continue
-      }
-
-      try {
-        const result = await runChapterPipeline({
-          project: proj,
-          characters: chars,
-          chapters: chaps,
-          summaryChain,
-          targetChapter: chapter,
-          plotArcs,
-          apiKey: key,
-          onStageChange: (stage) => setPipeline((p) => ({ ...p, stage })),
-          onOutput: (stage, text) => {
-            setPipeline((p) => ({ ...p, [stage]: text }))
-            if (stage === 'draft' || stage === 'final') {
-              setContent(text)
-            }
-          },
-          signal: abortController.signal,
-        })
-
-        setPipeline((p) => ({ ...p, stage: 'done' }))
-        setContent(result.final)
-
-        // Auto-save
-        await updateChapterContent(chapter.id, result.final)
-        setChapters((prev) =>
-          prev.map((c) =>
-            c.id === chapter.id ? { ...c, content: result.final, status: 'draft' } : c
-          )
-        )
-
-        batchRef.current.completed.push({ number: chapter.number, title: chapter.title })
-
-        // Fire-and-forget summary extraction
-        extractAndSaveSummary(chapter, result.final, proj, key).catch(() => {})
-
-      } catch (err) {
-        if (pipelineRef.current.abortFlag || abortController.signal.aborted) break
-
-        batchRef.current.failed.push({ number: chapter.number, title: chapter.title, error: err.message })
-        setError(`第${chapter.number}章 生成失败: ${err.message}`)
-      }
-    }
-
-    // Batch complete
-    setBatch((p) => ({ ...p, active: false }))
-    setPipeline((p) => ({ ...p, stage: 'idle' }))
-    setBatchResult({
-      completed: [...batchRef.current.completed],
-      failed: [...batchRef.current.failed],
-    })
-
-    const completedCount = batchRef.current.completed.length
-    const failedCount = batchRef.current.failed.length
-    if (failedCount === 0) {
-      setSavedMsg(`批量生成完成！共完成 ${completedCount} 章`)
-      showToast('success', `批量生成完成！共 ${completedCount} 章`)
-    } else {
-      setError(`批量生成完成：成功 ${completedCount} 章，失败 ${failedCount} 章`)
-      showToast('info', `批量生成：成功 ${completedCount} 章，失败 ${failedCount} 章`)
-    }
-  }
-
   const handleSave = async (targetStatus) => {
     const finalStatus = targetStatus || 'draft'
     if (!selected || saving) return
@@ -308,10 +194,6 @@ export default function WritePage() {
     if (pipelineRef.current.controller) {
       pipelineRef.current.controller.abort()
       pipelineRef.current.controller = null
-    }
-    if (batch.active) {
-      setBatch((p) => ({ ...p, active: false }))
-      showToast('info', '已中止批量生成')
     }
     setPipeline((p) => ({ ...p, stage: 'idle' }))
   }
@@ -377,11 +259,40 @@ export default function WritePage() {
 
       <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
         {/* Left: Chapter list */}
-        <div className="write-chapter-list">
+        <div className="write-chapter-list" ref={chapterListRef}>
           <div className="write-chapter-list-header">
             <h3>章节列表</h3>
             <span className="write-chapter-count">{chapters.length}</span>
           </div>
+          {chapters.length > 0 && (
+            <div className="write-chapter-nav">
+              <select
+                className="write-chapter-jump"
+                value={selectedId || ''}
+                onChange={(e) => {
+                  const chap = chapters.find((c) => c.id === Number(e.target.value))
+                  if (chap) handleSelect(chap)
+                }}
+              >
+                <option value="" disabled>跳转到...</option>
+                {chapters.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    第{c.number}章 {c.title || '未命名'} {c.content ? '✓' : '○'}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="btn btn-secondary btn-sm"
+                style={{ whiteSpace: 'nowrap' }}
+                onClick={() => {
+                  const next = chapters.find((c) => c.status === 'planned') || chapters.find((c) => c.status === 'draft')
+                  if (next) handleSelect(next)
+                }}
+              >
+                下一章待写
+              </button>
+            </div>
+          )}
           {chapters.length === 0 ? (
             <div className="empty-state" style={{ padding: 20 }}>
               <p style={{ fontSize: 13 }}>还没有章节，先去策划对话中规划章节吧</p>
@@ -390,20 +301,16 @@ export default function WritePage() {
             chapters.map((c) => {
               const st = statusLabel(c.status)
               const isActive = c.id === selectedId
-              const isGenerating = batch.active && isActive && pipeline.stage !== 'idle'
               return (
                 <div
                   key={c.id}
+                  data-chapter-id={c.id}
                   onClick={() => handleSelect(c)}
                   className={`write-chapter-item ${isActive ? 'active' : ''}`}
                 >
                   <div className="write-chapter-item-top">
                     <span className="write-chapter-num">第{c.number}章</span>
-                    {isGenerating ? (
-                      <span className="chapter-status status-generating">生成中</span>
-                    ) : (
-                      <span className={`chapter-status ${st.cls}`}>{st.text}</span>
-                    )}
+                    <span className={`chapter-status ${st.cls}`}>{st.text}</span>
                   </div>
                   <div className="write-chapter-item-title">{c.title || '未命名'}</div>
                   {c.summary && <div className="write-chapter-item-summary">{c.summary.slice(0, 40)}{c.summary.length > 40 ? '...' : ''}</div>}
@@ -464,7 +371,7 @@ export default function WritePage() {
                 className="form-input"
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                placeholder={pipeline.stage !== 'idle' && pipeline.stage !== 'done' ? 'AI 正在生成...' : '选择左侧章节，点击「流水线生成」按钮让 AI 开始写作，或直接在此输入文本...'}
+                placeholder={pipeline.stage !== 'idle' && pipeline.stage !== 'done' ? 'AI 正在生成...' : '选择左侧章节，点击「AI 生成本章」按钮让 AI 开始写作，或直接在此输入文本...'}
                 style={{
                   flex: 1,
                   resize: 'none',
@@ -476,27 +383,9 @@ export default function WritePage() {
                 disabled={pipeline.stage !== 'idle' && pipeline.stage !== 'done'}
               />
 
-              {/* Batch progress bar */}
-              {batch.active && (
-                <div className="batch-progress-bar">
-                  <span className="batch-progress-info">
-                    批量生成中：第 {batch.currentIndex + 1} / {batch.total} 章
-                  </span>
-                  <span className="batch-progress-stats">
-                    {batchRef.current.completed.length > 0 && (
-                      <span className="batch-success">已完成 {batchRef.current.completed.length}</span>
-                    )}
-                    {batchRef.current.failed.length > 0 && (
-                      <span className="batch-fail">失败 {batchRef.current.failed.length}</span>
-                    )}
-                  </span>
-                </div>
-              )}
-
               {/* Pipeline progress bar */}
               {pipeline.stage !== 'idle' && pipeline.stage !== 'done' && (
                 <div className="pipeline-bar">
-                  {batch.active && <span className="batch-chip">批量模式</span>}
                   {['outline', 'draft', 'review', 'polish'].map((stage) => {
                     const labels = { outline: '大纲', draft: '草稿', review: '审校', polish: '润色' }
                     const order = ['outline', 'draft', 'review', 'polish']
@@ -513,7 +402,7 @@ export default function WritePage() {
                     )
                   })}
                   <button className="btn btn-danger btn-sm" onClick={handleAbort} style={{ marginLeft: 12 }}>
-                    {batch.active ? '中止批量' : '中止'}
+                    中止
                   </button>
                 </div>
               )}
@@ -545,14 +434,7 @@ export default function WritePage() {
                     onClick={runPipeline}
                     disabled={pipeline.stage !== 'idle' && pipeline.stage !== 'done'}
                   >
-                    {pipeline.stage !== 'idle' && pipeline.stage !== 'done' ? '生成中...' : 'AI 流水线生成'}
-                  </button>
-                  <button
-                    className="btn btn-primary"
-                    onClick={runBatchPipeline}
-                    disabled={batch.active || (pipeline.stage !== 'idle' && pipeline.stage !== 'done') || chapters.filter((c) => c.status === 'planned').length === 0}
-                  >
-                    {batch.active ? '批量生成中...' : `批量生成 (${chapters.filter((c) => c.status === 'planned').length})`}
+                    {pipeline.stage !== 'idle' && pipeline.stage !== 'done' ? '生成中...' : 'AI 生成本章'}
                   </button>
                 </div>
                 <div className="write-action-divider" />
@@ -586,27 +468,6 @@ export default function WritePage() {
                 </span>
               </div>
 
-              {/* Batch result summary */}
-              {batchResult && (batchResult.completed.length > 0 || batchResult.failed.length > 0) && (
-                <div className="batch-summary" style={{ marginTop: 12 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
-                    批量生成结果：成功 {batchResult.completed.length} 章
-                    {batchResult.failed.length > 0 && <span style={{ color: '#D05858' }}>，失败 {batchResult.failed.length} 章</span>}
-                  </div>
-                  {batchResult.failed.length > 0 && (
-                    <div>
-                      {batchResult.failed.map((f) => (
-                        <div key={f.number} style={{ fontSize: 12, color: '#D05858', marginTop: 2 }}>
-                          第{f.number}章 &laquo;{f.title}&raquo;: {f.error}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <button className="btn btn-secondary btn-sm" style={{ marginTop: 8 }} onClick={() => setBatchResult(null)}>
-                    关闭
-                  </button>
-                </div>
-              )}
             </>
           ) : (
             <div className="empty-state">
