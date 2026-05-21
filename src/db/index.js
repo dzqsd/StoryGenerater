@@ -87,8 +87,8 @@ export async function getChapter(id) {
   return await db.chapters.get(Number(id))
 }
 
-export async function updateChapterContent(id, content) {
-  await db.chapters.update(Number(id), { content, status: 'draft' })
+export async function updateChapterContent(id, content, status) {
+  await db.chapters.update(Number(id), { content, status: status || 'draft' })
 }
 
 export async function deleteChapter(id) {

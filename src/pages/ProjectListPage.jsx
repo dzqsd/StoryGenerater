@@ -33,15 +33,15 @@ export default function ProjectListPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <h1 className="page-title" style={{ margin: 0 }}>📝 我的创作</h1>
+      <div className="page-header">
+        <h1 className="page-title" style={{ margin: 0 }}>我的创作</h1>
         <button className="btn btn-primary" onClick={() => setShowCreate(!showCreate)}>
-          ＋ 新建项目
+          + 新建项目
         </button>
       </div>
 
       {showCreate && (
-        <div className="card" style={{ marginBottom: 24 }}>
+        <div className="card create-card">
           <div className="form-group">
             <label className="form-label">项目名称</label>
             <input
@@ -53,19 +53,24 @@ export default function ProjectListPage() {
               autoFocus
             />
           </div>
-          <button
-            className="btn btn-primary"
-            onClick={handleCreate}
-            disabled={creating || !title.trim()}
-          >
-            {creating ? '创建中...' : '创建并开始对话'}
-          </button>
+          <div className="btn-group">
+            <button
+              className="btn btn-primary"
+              onClick={handleCreate}
+              disabled={creating || !title.trim()}
+            >
+              {creating ? '创建中...' : '创建并开始策划'}
+            </button>
+            <button className="btn btn-secondary" onClick={() => setShowCreate(false)}>
+              取消
+            </button>
+          </div>
         </div>
       )}
 
       {projects.length === 0 && !showCreate ? (
         <div className="empty-state">
-          <p>还没有创作项目，点击「新建项目」开始吧 ✍️</p>
+          <p>还没有创作项目，点击「新建项目」开始吧</p>
         </div>
       ) : (
         <div className="project-grid">
@@ -86,9 +91,9 @@ export default function ProjectListPage() {
                 {p.synopsis && <p className="project-synopsis">{p.synopsis.slice(0, 100)}...</p>}
               </div>
               <div className="project-card-actions">
-                <button className="btn btn-secondary btn-sm"
-                  onClick={(e) => { e.stopPropagation(); navigate(`/project/${p.id}/chat`) }}>
-                  💬 对话
+                <button className="btn btn-primary btn-sm"
+                  onClick={(e) => { e.stopPropagation(); navigate(`/project/${p.id}`) }}>
+                  进入
                 </button>
                 <button
                   className="btn btn-danger btn-sm"

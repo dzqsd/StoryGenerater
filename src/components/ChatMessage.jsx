@@ -8,7 +8,7 @@ export default function ChatMessage({ message, onOptionClick }) {
 
   return (
     <div className={`chat-message ${isUser ? 'user' : 'ai'}`}>
-      <div className="chat-avatar">{isUser ? '👤' : '🤖'}</div>
+      <div className="chat-avatar">{isUser ? 'U' : 'AI'}</div>
       <div className="chat-bubble-wrap">
         <div className={`chat-bubble ${isUser ? 'user-bubble' : 'ai-bubble'}`}>
           {text && <div className="chat-text">{text}</div>}

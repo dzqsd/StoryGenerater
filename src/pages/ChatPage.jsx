@@ -46,12 +46,14 @@ function extractChapters(content) {
     .map((line) => line.replace(/^\d+[.、)\s]+/, '').trim())
     .filter(Boolean)
     .map((line, i) => {
-      const parts = line.split(/[-—–]\s*/)
-      return {
-        number: i + 1,
-        title: (parts[0] || line).trim(),
-        summary: parts[1]?.trim() || '',
+      const sepMatch = line.match(/[-—–]\s*/)
+      let title = line
+      let summary = ''
+      if (sepMatch) {
+        title = line.slice(0, sepMatch.index).trim()
+        summary = line.slice(sepMatch.index + sepMatch[0].length).trim()
       }
+      return { number: i + 1, title, summary }
     })
 }
 
@@ -59,7 +61,7 @@ function extractChapters(content) {
 
 export default function ChatPage({ mode: propMode }) {
   const { id, mode: urlMode } = useParams()
-  const mode = propMode || urlMode || 'world'
+  const mode = propMode || urlMode || 'general'
   const navigate = useNavigate()
   const scrollRef = useRef(null)
 
@@ -78,6 +80,7 @@ export default function ChatPage({ mode: propMode }) {
   const projectRef = useRef(null)
   const charsRef = useRef([])
   const chapsRef = useRef([])
+  const _abortRef = useRef(null)
 
   useEffect(() => { messagesRef.current = messages }, [messages])
   useEffect(() => { projectRef.current = project }, [project])
@@ -119,7 +122,13 @@ export default function ChatPage({ mode: propMode }) {
 
     loadAndInit()
 
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      if (_abortRef.current) {
+        _abortRef.current.abort()
+        _abortRef.current = null
+      }
+    }
   }, [id, mode])
 
   const saveConv = useCallback(async (msgs) => {
@@ -153,9 +162,10 @@ export default function ChatPage({ mode: propMode }) {
     }
 
     const systemPrompt = modeConfig.systemPrompt(p || projectRef.current, chars || [], chaps || [])
+    const triggerMsg = { role: 'user', content: '你好，我们开始吧。', _internal: true }
     const msgs = [
       { role: 'system', content: systemPrompt },
-      { role: 'user', content: '你好，我们开始吧。' },
+      triggerMsg,
     ]
 
     setMessages(msgs)
@@ -163,16 +173,21 @@ export default function ChatPage({ mode: propMode }) {
     setStreaming(true)
     let content = ''
 
+    const abortCtrl = new AbortController()
+    _abortRef.current = abortCtrl
+
     await streamChat(msgs, {
       apiKey: key,
       temperature: 0.8,
       maxTokens: 2048,
+      signal: abortCtrl.signal,
       onChunk(chunk) {
         content += chunk
         setMessages([...msgs, { role: 'assistant', content }])
       },
       async onDone() {
         setStreaming(false)
+        _abortRef.current = null
         const final = [...msgs, { role: 'assistant', content }]
         setMessages(final)
         messagesRef.current = final
@@ -183,6 +198,7 @@ export default function ChatPage({ mode: propMode }) {
       onError(err) {
         setError(err)
         setStreaming(false)
+        _abortRef.current = null
       },
     })
   }
@@ -218,16 +234,21 @@ export default function ChatPage({ mode: propMode }) {
     setStreaming(true)
     let content = ''
 
+    const abortCtrl = new AbortController()
+    _abortRef.current = abortCtrl
+
     await streamChat(updated, {
       apiKey: key,
       temperature: 0.8,
       maxTokens: 2048,
+      signal: abortCtrl.signal,
       onChunk(chunk) {
         content += chunk
         setMessages([...updated, { role: 'assistant', content }])
       },
       async onDone() {
         setStreaming(false)
+        _abortRef.current = null
         const final = [...updated, { role: 'assistant', content }]
         setMessages(final)
         messagesRef.current = final
@@ -238,6 +259,7 @@ export default function ChatPage({ mode: propMode }) {
       onError(err) {
         setError(err)
         setStreaming(false)
+        _abortRef.current = null
       },
     })
   }
@@ -288,7 +310,7 @@ export default function ChatPage({ mode: propMode }) {
       if (synopsis && synopsis.length > 10) {
         await updateProject(p.id, { synopsis })
         setProject((prev) => ({ ...prev, synopsis }))
-        projectRef.current = { ...p, synopsis }
+        projectRef.current = { ...projectRef.current, synopsis }
 
         // Extract plot arcs from synopsis
         const arcPatterns = [
@@ -324,7 +346,18 @@ export default function ChatPage({ mode: propMode }) {
         const existingChapters = chapsRef.current
         for (const ch of newChapters) {
           const exists = existingChapters.find((ec) => ec.number === ch.number)
-          if (!exists) {
+          if (exists) {
+            // Update existing chapter title/summary (preserve content and status)
+            await saveChapter({
+              id: exists.id,
+              projectId: Number(id),
+              number: ch.number,
+              title: ch.title || exists.title,
+              summary: ch.summary || exists.summary,
+              status: exists.status,
+              content: exists.content || '',
+            })
+          } else {
             await saveChapter({
               projectId: Number(id),
               number: ch.number,
@@ -344,7 +377,7 @@ export default function ChatPage({ mode: propMode }) {
       if (updates && Object.keys(updates).length > 0) {
         await updateProject(p.id, updates)
         setProject((prev) => ({ ...prev, ...updates }))
-        projectRef.current = { ...p, ...updates }
+        projectRef.current = { ...projectRef.current, ...updates }
       }
     }
 
@@ -358,16 +391,19 @@ export default function ChatPage({ mode: propMode }) {
         if (content.includes(kw)) {
           await updateProject(p.id, { genre })
           setProject((prev) => ({ ...prev, genre }))
-          projectRef.current = { ...p, genre }
+          projectRef.current = { ...projectRef.current, genre }
           break
         }
       }
     }
   }
 
-  const handleOptionClick = (option) => {
-    handleSend(option)
-  }
+  const handleSendRef = useRef(null)
+  handleSendRef.current = handleSend
+
+  const handleOptionClick = useCallback((option) => {
+    handleSendRef.current?.(option)
+  }, [])
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -380,33 +416,51 @@ export default function ChatPage({ mode: propMode }) {
     return <div className="empty-state"><p>加载中...</p></div>
   }
 
+  const modeOptions = [
+    { value: 'general', label: '总策划' },
+    { value: 'world', label: '世界观' },
+    { value: 'characters', label: '人物' },
+    { value: 'plot', label: '剧情' },
+    { value: 'outline', label: '大纲' },
+    { value: 'revision', label: '修订' },
+  ]
+
   return (
     <div className="chat-page">
       <div className="chat-header">
-        <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/project/${id}`)}>
-          ← 返回总览
-        </button>
-        <h2 style={{ margin: 0, fontSize: 18 }}>
-          {modeConfig.icon} {modeConfig.name} — {project.title}
-        </h2>
+        <div className="chat-header-left">
+          <span className="chat-mode-badge">{modeConfig.name}</span>
+          <h2 className="chat-project-title">{project.title}</h2>
+        </div>
+        <div className="chat-header-right">
+          <select
+            className="chat-mode-select"
+            value={mode}
+            onChange={(e) => navigate(`/project/${id}/${e.target.value}`)}
+          >
+            {modeOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {error && (
-        <div className="card" style={{ border: '1px solid #e94560', color: '#e94560', padding: '8px 16px', marginBottom: 12 }}>
-          {error}
-          <button className="btn btn-sm btn-secondary" style={{ marginLeft: 12 }} onClick={() => setError('')}>关闭</button>
+        <div className="chat-error">
+          <span>{error}</span>
+          <button className="btn btn-sm btn-secondary" onClick={() => setError('')}>关闭</button>
         </div>
       )}
 
       <div className="chat-messages" ref={scrollRef}>
         {messages
-          .filter((m) => m.role !== 'system')
+          .filter((m) => m.role !== 'system' && !m._internal)
           .map((m, i) => (
             <ChatMessage key={i} message={m} onOptionClick={handleOptionClick} />
           ))}
-        {streaming && messages.filter((m) => m.role !== 'system').length === 0 && (
+        {streaming && messages.filter((m) => m.role !== 'system' && !m._internal).length === 0 && (
           <div className="chat-message ai">
-            <div className="chat-avatar">🤖</div>
+            <div className="chat-avatar">AI</div>
             <div className="chat-bubble ai-bubble">
               <span className="typing-dots"><span>.</span><span>.</span><span>.</span></span>
             </div>
@@ -417,7 +471,7 @@ export default function ChatPage({ mode: propMode }) {
       <div className="chat-input-area">
         <textarea
           className="chat-input"
-          placeholder="输入你的想法，或点击上方选项..."
+          placeholder="输入你的想法，Enter 发送，Shift+Enter 换行..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -425,11 +479,11 @@ export default function ChatPage({ mode: propMode }) {
           rows={2}
         />
         <button
-          className="btn btn-primary"
+          className="btn btn-primary chat-send-btn"
           onClick={() => handleSend()}
           disabled={streaming || !input.trim()}
         >
-          发送
+          {streaming ? '生成中...' : '发送'}
         </button>
       </div>
     </div>

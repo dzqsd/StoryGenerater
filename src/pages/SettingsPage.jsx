@@ -28,7 +28,7 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <h1 className="page-title">⚙️ 设置</h1>
+      <h1 className="page-title">设置</h1>
       <div className="card settings-card">
         <div className="form-group">
           <label className="form-label">DeepSeek API Key</label>
@@ -39,7 +39,7 @@ export default function SettingsPage() {
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
           />
-          <p style={{ fontSize: 12, color: '#888', marginTop: 6 }}>
+          <p style={{ fontSize: 12, color: '#9A9A9A', marginTop: 6 }}>
             使用 deepseek-v4-flash 模型。API Key 仅保存在浏览器本地。
           </p>
         </div>
@@ -74,7 +74,7 @@ export default function SettingsPage() {
         </div>
 
         <button className="btn btn-primary" onClick={handleSave}>
-          {saved ? '✅ 已保存' : '保存设置'}
+          {saved ? '已保存' : '保存设置'}
         </button>
       </div>
     </div>

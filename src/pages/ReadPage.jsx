@@ -78,21 +78,21 @@ export default function ReadPage() {
       {/* Top toolbar */}
       <div ref={topRef} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24, flexWrap: 'wrap' }}>
         <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/project/${id}`)}>
-          ← 返回
+          &larr; 返回
         </button>
         <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/project/${id}/write`)}>
-          ✍️ 写作
+          写作
         </button>
 
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 12, color: '#666' }}>
+          <span style={{ fontSize: 12, color: '#9A9A9A' }}>
             共 {chapters.length} 章 / 约 {totalWords} 字
           </span>
           <button className="btn btn-secondary btn-sm" onClick={handleExportChapter} disabled={!current}>
-            📥 导出本章
+            导出本章
           </button>
           <button className="btn btn-primary btn-sm" onClick={handleExportFull} disabled={chapters.length === 0}>
-            📥 导出全书
+            导出全书
           </button>
         </div>
       </div>
@@ -122,7 +122,7 @@ export default function ReadPage() {
               onClick={() => goTo(currentIdx - 1)}
               disabled={currentIdx <= 0}
             >
-              ◀ 上一章
+              &lt; 上一章
             </button>
 
             <select
@@ -133,7 +133,7 @@ export default function ReadPage() {
             >
               {chapters.map((c, i) => (
                 <option key={c.id} value={i}>
-                  第{c.number}章 {c.title || '未命名'} {c.summary ? `— ${c.summary.slice(0, 30)}${c.summary.length > 30 ? '...' : ''}` : ''}
+                  第{c.number}章 {c.title || '未命名'}
                 </option>
               ))}
             </select>
@@ -143,10 +143,10 @@ export default function ReadPage() {
               onClick={() => goTo(currentIdx + 1)}
               disabled={currentIdx >= chapters.length - 1}
             >
-              下一章 ▶
+              下一章 &gt;
             </button>
 
-            <span style={{ fontSize: 12, color: '#666', marginLeft: 8 }}>
+            <span style={{ fontSize: 12, color: '#9A9A9A', marginLeft: 8 }}>
               {currentIdx + 1} / {chapters.length}
             </span>
           </div>
@@ -166,11 +166,11 @@ export default function ReadPage() {
               onClick={() => goTo(currentIdx - 1)}
               disabled={currentIdx <= 0}
             >
-              ◀ 上一章
+              &lt; 上一章
             </button>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 13, color: '#888' }}>
+              <span style={{ fontSize: 13, color: '#7A7A7A' }}>
                 {currentIdx + 1} / {chapters.length}
               </span>
             </div>
@@ -180,12 +180,12 @@ export default function ReadPage() {
               onClick={() => goTo(currentIdx + 1)}
               disabled={currentIdx >= chapters.length - 1}
             >
-              下一章 ▶
+              下一章 &gt;
             </button>
           </div>
 
-          <div style={{ textAlign: 'center', marginTop: 12, fontSize: 11, color: '#555' }}>
-            提示：按 ← → 方向键切换章节
+          <div style={{ textAlign: 'center', marginTop: 12, fontSize: 11, color: '#9A9A9A' }}>
+            提示：按 &larr; &rarr; 方向键切换章节
           </div>
         </>
       )}

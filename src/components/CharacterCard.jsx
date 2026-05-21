@@ -2,7 +2,6 @@ export default function CharacterCard({ character, onDelete }) {
   return (
     <div className="char-card">
       <div className="char-card-header">
-        <span className="char-avatar">👤</span>
         <span className="char-name">{character.name}</span>
         <span className="char-role">{character.role}</span>
         {onDelete && (

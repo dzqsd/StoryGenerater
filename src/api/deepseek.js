@@ -1,7 +1,8 @@
 const API_BASE = 'https://api.deepseek.com/v1'
 
-export async function streamChat(messages, { apiKey, temperature = 0.8, maxTokens = 4096, onChunk, onDone, onError }) {
-  const controller = new AbortController()
+export async function streamChat(messages, { apiKey, temperature = 0.8, maxTokens = 4096, onChunk, onDone, onError, signal }) {
+  const controller = signal ? null : new AbortController()
+  const effectiveSignal = signal || controller.signal
 
   try {
     const response = await fetch(`${API_BASE}/chat/completions`, {
@@ -17,7 +18,7 @@ export async function streamChat(messages, { apiKey, temperature = 0.8, maxToken
         max_tokens: maxTokens,
         stream: true,
       }),
-      signal: controller.signal,
+      signal: effectiveSignal,
     })
 
     if (!response.ok) {
@@ -59,5 +60,5 @@ export async function streamChat(messages, { apiKey, temperature = 0.8, maxToken
     onError?.(err.message)
   }
 
-  return controller
+  return controller || { abort: () => {} }
 }

@@ -1,12 +1,11 @@
 /**
  * Chat mode configurations for 5 planning scenarios.
- * Each mode has its own system prompt, opening message, data extraction logic.
+ * Each mode has its own system prompt and data extraction logic.
  */
 
 export const CHAT_MODES = {
   world: {
     name: '世界观策划',
-    icon: '🌍',
     route: 'world',
     systemPrompt: (project, characters, chapters) => {
       const charBlock = characters.length > 0
@@ -27,7 +26,12 @@ export const CHAT_MODES = {
 - 用户确定后，简要确认然后进入下一个问题
 - 不要涉及人物设计或剧情规划，那有专门的入口
 - 用中文交流，不用 markdown 格式
-- 当用户已确定题材和世界观方向后，在回复末尾加上 [SETTING:已确认]，帮助系统记录
+- 当用户已确定题材和世界观方向后，用以下格式输出确认信息（在回复末尾）：
+
+世界观：<详细描述，可多行>
+[SETTING:已确认]
+
+系统会自动提取并保存。
 
 现在开始对话。先自我介绍（你是世界观设计师），然后问用户想写什么题材，用 [OPTIONS] 提供选项。
 
@@ -42,13 +46,22 @@ ${charBlock}`
     openingMessage: '',
     dataExtractor: (content, project) => {
       const updates = {}
-      // Extract genre
+      // Extract genre (allow update)
       const genreMatch = content.match(/题材[：:]\s*(.+)/)
-      if (genreMatch && !project.genre) updates.genre = genreMatch[1].trim()
-      // Check for setting confirmation tag
-      if (content.includes('[SETTING:已确认]')) {
-        const settingLines = content.match(/世界观[：:]\s*(.+)/)
-        if (settingLines) updates.setting = settingLines[1].trim()
+      if (genreMatch) {
+        const g = genreMatch[1].trim()
+        if (g && g !== project.genre) updates.genre = g
+      }
+      // Extract setting on confirmation tag or explicit label
+      const tagMatch = content.match(/世界观[：:]\s*([\s\S]+?)(?=\[SETTING:已确认\]|$)/)
+      if (tagMatch) {
+        const setting = tagMatch[1].trim()
+        // Capture if confirmed by tag, or if substantial enough
+        if (content.includes('[SETTING:已确认]') && setting.length > 5) {
+          updates.setting = setting
+        } else if (setting.length > 20 && setting !== project.setting) {
+          updates.setting = setting
+        }
       }
       return updates
     },
@@ -172,14 +185,15 @@ ${chapterList}
 
 你的职责：
 1. 基于主线概要，规划章节结构（建议8-15章）
-2. 每章给出：序号、标题、详细概要（3-5句话）
-3. 概要包含：本章发生什么、涉及哪些人物、推进了什么剧情
+2. 每章给出：序号、标题、详细概要
+3. 概要必须详细：至少40字（3-5句话），说清楚本章核心事件、出场人物、剧情推进、与前后章关系
 4. 帮助调整章节顺序、合并或拆分
 
 规则：
 - 确定章节计划后，用 [CHAPTERS]...[/CHAPTERS] 标签列出
-  格式每行："序号. 标题 - 概要在同一条"
-- 概要需详细（3-5句话），不要只有一句话
+  格式每行："序号. 标题 —— 概要"
+  示例："1. 剑宗遗孤 —— 主角林风目睹剑宗被灭门，带着师父遗留的剑谱逃入深山，三年苦修后首次下山复仇，却在途中遇到神秘少女相助"
+- 概要是本章内容的精华，必须详细具体，不能笼统（如"主角成长"太笼统）
 - 不要写正文，只规划结构
 - 用中文交流，不用 markdown 格式
 - 需要修改调整时，重新输出完整的 [CHAPTERS] 标签
@@ -231,6 +245,97 @@ ${chapterList}
     },
     openingMessage: '',
     dataExtractor: () => null,
+  },
+
+  general: {
+    name: '总策划',
+    icon: '🎯',
+    route: 'general',
+    systemPrompt: (project, characters, chapters) => {
+      const charBlock = characters.length > 0
+        ? characters.map((c) => `- ${c.name}（${c.role}）：${c.traits || ''}；背景：${c.background || ''}`).join('\n')
+        : '（暂无）'
+
+      const chapterList = chapters.length > 0
+        ? chapters.map((c) => {
+            let line = `第${c.number}章「${c.title || ''}」[${c.status}] ${c.summary || ''}`
+            if (c.content) line += ` | 已写约${Math.round(c.content.length / 2)}字`
+            return line
+          }).join('\n')
+        : '（暂无）'
+
+      const writtenChapters = chapters.filter((c) => c.content)
+      const writtenBlock = writtenChapters.length > 0
+        ? writtenChapters.map((c) =>
+            `第${c.number}章「${c.title || ''}」正文开头：${c.content.slice(0, 150).replace(/\n/g, ' ')}...`
+          ).join('\n')
+        : '（暂无已写章节）'
+
+      return `你是「总策划」——一位全能的小说创作顾问。你精通世界观设计、人物塑造、剧情规划、章节大纲编排和内容修订等所有创作环节。
+
+用户可能在任何阶段向你咨询任何问题，你需要灵活应对。
+
+====== 当前项目全貌 ======
+- 标题：${project.title || '未定'}
+- 题材：${project.genre || '未定'}
+- 世界观：${project.setting || '未定'}
+- 主线概要：${project.synopsis || '未定'}
+
+====== 已有人物 ======
+${charBlock}
+
+====== 章节规划 ======
+${chapterList}
+
+====== 已写章节（供修订参考） ======
+${writtenBlock}
+
+你的职责：
+1. 回答用户关于小说创作的任何问题
+2. 可以同时讨论世界观、人物、剧情、大纲、修订
+3. 根据对话内容灵活输出结构化数据
+
+输出标签使用规则：
+- 确认角色设定后，用 [CHARACTER]...[/CHARACTER] 标签标注（格式同人物策划）
+- 确定主线概要后，用 [SYNOPSIS]...[/SYNOPSIS] 标签总结
+- 确定章节计划后，用 [CHAPTERS]...[/CHAPTERS] 标签列出。格式："序号. 标题 —— 详细概要（至少40字，说清楚核心事件、出场人物、剧情推进）"
+- 确定世界观后，用以下格式输出确认信息（在回复末尾）：
+世界观：<详细描述，可多行>
+[SETTING:已确认]
+- 需要用户选择时，用 [OPTIONS]...[/OPTIONS] 提供2-4个选项
+- 重写段落时，用 [REWRITE]...[/REWRITE] 输出内容
+
+交流规则：
+- 根据用户的问题自然切换话题，不强行推进某个环节
+- 用户问什么就答什么，但可以主动提醒遗漏的重要设定
+- 每次聚焦1-2个问题，不要一次输出所有标签
+- 需要选择时提供 [OPTIONS]，不需要时不要强行加
+- 用中文交流，不用 markdown 格式
+
+现在开始对话。先自我介绍——你是全能创作顾问「总策划」，可以帮用户解决小说创作的任何问题。然后询问用户当前想聊什么。`
+    },
+    openingMessage: '',
+    dataExtractor: (content, project) => {
+      const updates = {}
+      const genreMatch = content.match(/题材[：:]\s*(.+)/)
+      if (genreMatch) {
+        const g = genreMatch[1].trim()
+        if (g && g !== project.genre) updates.genre = g
+      }
+      const tagMatch = content.match(/世界观[：:]\s*([\s\S]+?)(?=\[SETTING:已确认\]|$)/)
+      if (tagMatch) {
+        const setting = tagMatch[1].trim()
+        if (content.includes('[SETTING:已确认]') && setting.length > 5) {
+          updates.setting = setting
+        } else if (setting.length > 20 && setting !== project.setting) {
+          updates.setting = setting
+        }
+      }
+      return updates
+    },
+    extractCharacters: true,
+    extractSynopsis: true,
+    extractChapters: true,
   },
 }
 

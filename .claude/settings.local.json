@@ -18,7 +18,20 @@
       "Bash(npm list *)",
       "Bash(npm search *)",
       "Bash(winget install *)",
-      "Bash(scoop install *)"
+      "Bash(scoop install *)",
+      "Bash(git *)",
+      "Bash(node test-save-load.js)",
+      "Bash(uipro init *)",
+      "Bash(python skills/ui-ux-pro-max/scripts/search.py \"story writing creative tool minimal clean light\" --design-system -p \"Story Generator\" -f markdown)",
+      "Bash(python \".claude/skills/ui-ux-pro-max/scripts/search.py\" \"story writing creative tool minimalist clean light\" --design-system -p \"Story Generator\" -f markdown)",
+      "Bash(python \".claude/skills/ui-ux-pro-max/scripts/search.py\" \"warm neutral balanced moderate\" --design-system -p \"Story Generator\" -f markdown)",
+      "Bash(python \".claude/skills/ui-ux-pro-max/scripts/search.py\" \"minimal professional\" --domain color -n 5)",
+      "Bash(python \".claude/skills/ui-ux-pro-max/scripts/search.py\" \"writing reading creative tool warm soft\" --design-system -p \"Story Generator\" -f markdown)",
+      "WebFetch(domain:www.mayiwsk.com)",
+      "Bash(python3 *)",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"creative writing tool storytelling novelist\" --design-system -p \"小说工坊\" -f markdown)",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"minimal clean dashboard project list\" --domain landing)",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"empty state onboarding loading\" --domain ux)"
     ]
   }
 }
