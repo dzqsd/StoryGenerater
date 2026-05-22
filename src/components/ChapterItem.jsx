@@ -1,3 +1,5 @@
+import { countWords } from '../utils/wordCount'
+
 const STATUS_MAP = {
   planned: { label: '待写', cls: 'status-planned' },
   draft: { label: '草稿', cls: 'status-draft' },
@@ -15,7 +17,7 @@ export default function ChapterItem({ chapter, onWrite, onClick }) {
         {chapter.summary && <div className="chapter-summary">{chapter.summary}</div>}
         {chapter.content && (
           <div className="chapter-word-count">
-            约 {Math.round(chapter.content.length / 2)} 字
+            约 {countWords(chapter.content)} 字
           </div>
         )}
       </div>

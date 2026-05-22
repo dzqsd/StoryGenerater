@@ -1,16 +1,29 @@
 import Dexie from 'dexie'
 
-const db = new Dexie('StoryGenerater')
+let db
+let dbAvailable = true
 
-db.version(4).stores({
-  projects: '++id, title, status, createdAt',
-  characters: '++id, projectId, name',
-  chapters: '++id, projectId, number, status',
-  conversations: '++id, projectId, mode',
-  settings: 'key',
-  chapter_summaries: '++id, chapterId',
-  plot_arcs: '++id, projectId, type, status',
-})
+try {
+  db = new Dexie('StoryGenerater')
+
+  db.version(4).stores({
+    projects: '++id, title, status, createdAt',
+    characters: '++id, projectId, name',
+    chapters: '++id, projectId, number, status',
+    conversations: '++id, projectId, mode',
+    settings: 'key',
+    chapter_summaries: '++id, chapterId',
+    plot_arcs: '++id, projectId, type, status',
+  })
+} catch (err) {
+  console.error('IndexedDB 初始化失败:', err)
+  dbAvailable = false
+  db = null
+}
+
+export function isDBAvailable() {
+  return dbAvailable
+}
 
 // ====== Projects ======
 

@@ -3,27 +3,18 @@
  * Strips structured tags from display text and extracts clickable options.
  */
 
-const STRUCT_TAGS = [
+const EXACT_TAGS = [
   '[CHARACTER]', '[/CHARACTER]',
   '[SYNOPSIS]', '[/SYNOPSIS]',
   '[CHAPTERS]', '[/CHAPTERS]',
-  '[PHASE:', '[/PHASE]',
-  '[SETTING:', '[/SETTING]',
   '[REWRITE]', '[/REWRITE]',
 ]
 
 function stripStructTags(text) {
   let out = text
-  for (const tag of STRUCT_TAGS) {
-    if (tag.endsWith(']') && !tag.endsWith(']') === false) {
-      // Exact tags like [CHARACTER]
-      out = out.split(tag).join('')
-    } else {
-      // Prefix tags like [PHASE:xxx]
-      out = out.split(tag).join('')
-    }
+  for (const tag of EXACT_TAGS) {
+    out = out.split(tag).join('')
   }
-  // Also strip [PHASE:xxx] and [SETTING:xxx] (with variable content)
   out = out.replace(/\[PHASE:\w+\]/g, '')
   out = out.replace(/\[SETTING:[^\]]+\]/g, '')
   return out

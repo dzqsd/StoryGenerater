@@ -10,8 +10,18 @@
  * 对比两种模式下 AI 对早期章节细节的回忆能力。
  */
 
+import { readFileSync } from 'fs'
+import { resolve, dirname } from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 const API_BASE = 'https://api.deepseek.com/v1'
-const API_KEY = 'sk-30c1e7d7c3d646bd941e683f304b6495'
+const API_KEY = process.env.DEEPSEEK_API_KEY
+  || (() => { try { return readFileSync(resolve(__dirname, 'api.txt'), 'utf-8').trim() } catch { return '' } })()
+if (!API_KEY) {
+  console.error('请设置 DEEPSEEK_API_KEY 环境变量或在项目根目录创建 api.txt 文件')
+  process.exit(1)
+}
 
 // ====== 测试故事设定 ======
 

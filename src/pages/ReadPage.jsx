@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { getProject, getChaptersByProject } from '../db'
+import { countWords } from '../utils/wordCount'
 
 export default function ReadPage() {
   const { id } = useParams()
@@ -59,19 +60,18 @@ export default function ReadPage() {
     }
   }
 
-  const handleKeyDown = (e) => {
-    if (e.key === 'ArrowLeft') goTo(currentIdx - 1)
-    if (e.key === 'ArrowRight') goTo(currentIdx + 1)
-  }
-
   useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'ArrowLeft') goTo(currentIdx - 1)
+      if (e.key === 'ArrowRight') goTo(currentIdx + 1)
+    }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  })
+  }, [currentIdx, chapters.length])
 
   if (!project) return <div className="empty-state"><p>加载中...</p></div>
 
-  const totalWords = chapters.reduce((sum, c) => sum + Math.round(c.content.length / 2), 0)
+  const totalWords = chapters.reduce((sum, c) => sum + countWords(c.content), 0)
   const current = chapters[currentIdx]
 
   return (

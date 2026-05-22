@@ -7,6 +7,7 @@ import {
   getPlotArcsByProject, updatePlotArcStatus, deletePlotArc,
   savePlotArc,
 } from '../db'
+import { countWords } from '../utils/wordCount'
 import CharacterCard from '../components/CharacterCard'
 import ChapterItem from '../components/ChapterItem'
 
@@ -403,7 +404,7 @@ export default function ProjectDashboard() {
                       {c.summary && <div className="timeline-node-summary">{c.summary}</div>}
                       {c.content && (
                         <div className="timeline-node-meta">
-                          约 {Math.round(c.content.length / 2)} 字
+                          约 {countWords(c.content)} 字
                         </div>
                       )}
                     </div>
@@ -536,7 +537,7 @@ export default function ProjectDashboard() {
                           第{c.number}章 {c.title || '未命名'}
                         </span>
                         <span style={{ fontSize: 12, color: '#9A9A9A' }}>
-                          约 {Math.round(c.content.length / 2)} 字
+                          约 {countWords(c.content)} 字
                         </span>
                       </div>
                       {c.summary && (
@@ -641,7 +642,7 @@ export default function ProjectDashboard() {
                     <div className="revision-chapter-header">
                       <span className="revision-chapter-num">第{c.number}章</span>
                       <span className="revision-chapter-title">{c.title || '未命名'}</span>
-                      <span className="revision-word-count">约 {Math.round(c.content.length / 2)} 字</span>
+                      <span className="revision-word-count">约 {countWords(c.content)} 字</span>
                     </div>
                     {c.summary && (
                       <div className="revision-chapter-summary">{c.summary}</div>
@@ -719,75 +720,6 @@ export default function ProjectDashboard() {
         </div>
       )}
 
-      {/* Chapters Tab — merged into Outline tab above */}
-      {false && tab === 'chapters' && (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <h3 style={{ fontFamily: 'Archivo, sans-serif', fontSize: 16 }}>章节列表</h3>
-            <button className="btn btn-primary btn-sm" onClick={() => setShowChapForm(!showChapForm)}>
-              + 添加章节
-            </button>
-          </div>
-
-          {showChapForm && (
-            <div className="card" style={{ marginBottom: 16 }}>
-              <div className="form-group">
-                <label className="form-label">章节序号</label>
-                <input className="form-input" type="number" value={chapForm.number} onChange={(e) => setChapForm({ ...chapForm, number: parseInt(e.target.value) || 1 })} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">章节标题</label>
-                <input className="form-input" value={chapForm.title} onChange={(e) => setChapForm({ ...chapForm, title: e.target.value })} placeholder="输入章节标题" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">章节概要</label>
-                <textarea className="form-input" rows={2} value={chapForm.summary} onChange={(e) => setChapForm({ ...chapForm, summary: e.target.value })} placeholder="这一章讲了什么..." />
-              </div>
-              <button className="btn btn-primary btn-sm" onClick={handleAddChapter} disabled={!chapForm.title.trim()}>保存章节</button>
-            </div>
-          )}
-
-          {chapters.length === 0 ? (
-            <div className="empty-state"><p>还没有章节，去对话中让 AI 帮你规划吧</p></div>
-          ) : (
-            <div>
-              {chapters.map((c) => (
-                <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <div style={{ flex: 1 }}>
-                    <ChapterItem
-                      chapter={c}
-                      onWrite={(chap) => {
-                        navigate(`/project/${id}/write`)
-                      }}
-                      onClick={(chap) => {
-                        const el = document.getElementById(`chapter-content-${chap.id}`)
-                        if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none'
-                      }}
-                    />
-                  </div>
-                  <button className="btn btn-secondary btn-sm" onClick={() => {
-                    if (!c.content) return
-                    const text = `第${c.number}章 ${c.title || ''}\n\n${c.content}`
-                    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
-                    const url = URL.createObjectURL(blob)
-                    const a = document.createElement('a')
-                    a.href = url
-                    a.download = `第${c.number}章 ${c.title || ''}.txt`
-                    a.click()
-                    URL.revokeObjectURL(url)
-                  }} style={{ flexShrink: 0 }} disabled={!c.content}>导出</button>
-                  <button className="btn btn-danger btn-sm" onClick={() => handleDeleteChapter(c.id)} style={{ flexShrink: 0 }}>删</button>
-                </div>
-              ))}
-              {chapters.filter((c) => c.content).map((c) => (
-                <div key={`content-${c.id}`} id={`chapter-content-${c.id}`} className="card" style={{ display: 'none', marginTop: 8, marginBottom: 16, whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
-                  {c.content}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   )
 }

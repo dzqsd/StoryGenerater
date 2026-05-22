@@ -10,6 +10,7 @@ import {
   getOpenPlotArcs,
 } from '../db'
 import { runChapterPipeline, extractAndSaveSummary } from '../utils/chapterPipeline'
+import { countWords } from '../utils/wordCount'
 
 export default function WritePage() {
   const { id } = useParams()
@@ -51,6 +52,19 @@ export default function WritePage() {
     final: '',
   })
   const pipelineRef = useRef({ abortFlag: false, controller: null })
+  const savedContentRef = useRef('')
+
+  // Unsaved changes warning
+  useEffect(() => {
+    const handler = (e) => {
+      if (content !== savedContentRef.current) {
+        e.preventDefault()
+        e.returnValue = ''
+      }
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [content])
 
   // Load data
   useEffect(() => {
@@ -91,7 +105,9 @@ export default function WritePage() {
 
   const handleSelect = (chap) => {
     setSelectedId(chap.id)
-    setContent(chap.content || '')
+    const c = chap.content || ''
+    setContent(c)
+    savedContentRef.current = c
     setError('')
     setSavedMsg('')
   }
@@ -167,6 +183,7 @@ export default function WritePage() {
       )
       const label = finalStatus === 'done' ? '已定稿' : '已保存'
       setSavedMsg(label)
+      savedContentRef.current = content
       showToast('success', finalStatus === 'done' ? '章节已定稿 ✓' : '草稿已保存 ✓')
 
       // Auto-extract structured summary after save
@@ -316,7 +333,7 @@ export default function WritePage() {
                   {c.summary && <div className="write-chapter-item-summary">{c.summary.slice(0, 40)}{c.summary.length > 40 ? '...' : ''}</div>}
                   {c.content && (
                     <div className="write-chapter-item-meta">
-                      约 {Math.round(c.content.length / 2)} 字
+                      约 {countWords(c.content)} 字
                     </div>
                   )}
                 </div>
@@ -464,7 +481,7 @@ export default function WritePage() {
                   导出本章
                 </button>
                 <span className="write-word-count">
-                  {content ? `约 ${Math.round(content.length / 2)} 字` : ''}
+                  {content ? `约 ${countWords(content)} 字` : ''}
                 </span>
               </div>
 
