@@ -74,8 +74,8 @@ export default function HomePage() {
           </div>
 
           <p style={{ fontSize: 13, color: '#7A7A7A', lineHeight: 1.7, marginBottom: 16 }}>
-            创建项目后，依次使用以下 6 个策划模块完成小说规划。<strong>推荐顺序：世界观 → 人物 → 剧情 → 章节</strong>，
-            也可以随时使用「总策划」进行综合性讨论。
+            创建项目后，依次使用以下 5 个策划模块完成小说规划。<strong>推荐顺序：世界观 → 人物 → 章节</strong>，
+            也可以随时使用「总策划」进行综合性讨论。主线概要（synopsis）在总策划或章节策划中产出。
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
@@ -83,7 +83,7 @@ export default function HomePage() {
               { key: 'general', name: '总策划', icon: '★', desc: '全能顾问。可同时处理世界观、人物、剧情、章节等一切策划需求。适合头脑风暴或综合性问题。', tip: '不知道该找谁聊时，来这里就对了' },
               { key: 'world', name: '世界观', icon: '◎', desc: '设计故事的时代背景、地理环境、势力格局、力量体系等设定。确认后 [SETTING:已确认] 标签会自动保存。', tip: '最先使用，奠定故事的氛围与规则' },
               { key: 'characters', name: '人物', icon: '👤', desc: '创建角色档案（姓名、身份、性格、背景），AI 帮你丰富细节。使用 [CHARACTER] 标签结构化输出并自动入库。', tip: '世界观之后使用，让角色生长在设定中' },
-              { key: 'plot', name: '剧情', icon: '◎', desc: '规划主线概要、核心冲突与伏笔埋设。AI 会自动识别伏笔、冲突、角色弧光，输出 [SYNOPSIS] 标签。', tip: '关注"故事讲什么"，确定整体走向' },
+
               { key: 'outline', name: '章节', icon: '≡', desc: '将主线拆分为具体的章节序列，每章有标题和概要。使用 [CHAPTERS] 标签输出，在仪表盘可视化展示。', tip: '关注"故事怎么分章"，是写作前的最后一步' },
               { key: 'revision', name: '修订', icon: '✎', desc: '对已完成章节进行回顾讨论，获取改进建议。无结构化数据输出，侧重自由讨论。', tip: '写作过程中随时回来检视' },
             ].map((m) => (
@@ -153,7 +153,7 @@ export default function HomePage() {
             </svg>
           </div>
           <h3 className="home-empty-title">开始你的第一部作品</h3>
-          <p className="home-empty-desc">创建项目后，AI 将协助你完成世界观、人物、剧情和章节的全流程策划</p>
+          <p className="home-empty-desc">创建项目后，AI 将协助你完成世界观、人物和章节的全流程策划</p>
           <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
             + 新建项目
           </button>

@@ -1,4 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
+import useDarkMode from '../hooks/useDarkMode'
 
 const globalNav = [
   { to: '/', label: '我的作品', end: true },
@@ -9,7 +10,7 @@ const projectNav = [
   { to: 'general', label: '总策划' },
   { to: 'world', label: '世界观' },
   { to: 'characters', label: '人物' },
-  { to: 'plot', label: '剧情' },
+
   { to: 'outline', label: '章节' },
   { to: 'revision', label: '修订' },
 ]
@@ -23,6 +24,7 @@ export default function Layout({ children }) {
   const location = useLocation()
   const inProject = location.pathname.startsWith('/project/')
   const id = inProject ? location.pathname.split('/')[2] : null
+  const { isDark, toggle } = useDarkMode()
 
   return (
     <div className="app-layout">
@@ -74,6 +76,9 @@ export default function Layout({ children }) {
                 ))}
               </div>
               <div className="sidebar-divider" />
+              <button className="theme-toggle" onClick={toggle} title={isDark ? '切换亮色模式' : '切换暗色模式'}>
+                {isDark ? '☀' : '☾'}
+              </button>
               <NavLink
                 to="/"
                 end

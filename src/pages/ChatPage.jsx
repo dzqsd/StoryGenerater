@@ -5,7 +5,7 @@ import db, {
   getCharactersByProject, getChaptersByProject,
   getProjectConversation, saveProjectConversation,
   getSetting, saveCharacter, saveChapter,
-  savePlotArc,
+  savePlotArc, saveCharacterRelation,
 } from '../db'
 import { streamChat } from '../api/deepseek'
 import ChatMessage from '../components/ChatMessage'
@@ -60,6 +60,27 @@ function extractChapters(content) {
       }
       return { number: number || (i + 1), title, summary }
     })
+}
+
+function extractRelations(content, existingCharacters) {
+  const re = /\[RELATION\]([\s\S]*?)\[\/RELATION\]/g
+  const results = []
+  let match
+  while ((match = re.exec(content)) !== null) {
+    const block = match[1].trim()
+    const charA = (block.match(/角色A[：:]\s*(.+)/) || [])[1]?.trim()
+    const charB = (block.match(/角色B[：:]\s*(.+)/) || [])[1]?.trim()
+    const type = (block.match(/关系[：:]\s*(.+)/) || [])[1]?.trim()
+    const description = (block.match(/描述[：:]\s*(.+)/) || [])[1]?.trim()
+    if (charA && charB && type) {
+      const fromChar = existingCharacters.find((c) => c.name === charA)
+      const toChar = existingCharacters.find((c) => c.name === charB)
+      if (fromChar && toChar) {
+        results.push({ fromCharId: fromChar.id, toCharId: toChar.id, type, description: description || '' })
+      }
+    }
+  }
+  return results
 }
 
 // ====== ChatPage Component ======
@@ -307,6 +328,12 @@ export default function ChatPage({ mode: propMode }) {
           }
         }
       }
+
+      // Extract character relations
+      const relations = extractRelations(content, charArr)
+      for (const rel of relations) {
+        await saveCharacterRelation({ projectId: Number(id), ...rel })
+      }
     }
 
     // Synopsis extraction (plot mode)
@@ -425,7 +452,7 @@ export default function ChatPage({ mode: propMode }) {
     { value: 'general', label: '总策划' },
     { value: 'world', label: '世界观' },
     { value: 'characters', label: '人物' },
-    { value: 'plot', label: '剧情' },
+
     { value: 'outline', label: '章节' },
     { value: 'revision', label: '修订' },
   ]

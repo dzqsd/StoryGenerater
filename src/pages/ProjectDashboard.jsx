@@ -6,10 +6,13 @@ import {
   saveCharacter, saveChapter, deleteCharacter, deleteChapter,
   getPlotArcsByProject, updatePlotArcStatus, deletePlotArc,
   savePlotArc,
+  getSnapshotsByChapter, getDailyWritingDates,
+  saveCharacterRelation, getCharacterRelations,
 } from '../db'
 import { countWords } from '../utils/wordCount'
 import CharacterCard from '../components/CharacterCard'
 import ChapterItem from '../components/ChapterItem'
+import RelationGraph from '../components/RelationGraph'
 
 export default function ProjectDashboard() {
   const { id } = useParams()
@@ -33,9 +36,62 @@ export default function ProjectDashboard() {
   const [expandedChapterId, setExpandedChapterId] = useState(null)
   const [outlinePage, setOutlinePage] = useState(1)
   const [timelinePage, setTimelinePage] = useState(1)
+  const [stats, setStats] = useState(null)
+  const [characterRelations, setCharacterRelations] = useState([])
+  const [showRelationForm, setShowRelationForm] = useState(false)
+  const [relationForm, setRelationForm] = useState({ fromCharId: 0, toCharId: 0, type: '师徒', description: '' })
   const PAGE_SIZE = 6
   const timelineJumpRef = useRef(null)
   const outlineJumpRef = useRef(null)
+
+  const computeStats = async () => {
+    const chapters = await getChaptersByProject(id)
+    const plotArcs = await getPlotArcsByProject(id)
+    const allSnapshots = []
+    for (const ch of chapters) {
+      const snaps = await getSnapshotsByChapter(ch.id)
+      allSnapshots.push(...snaps)
+    }
+
+    const totalWords = chapters
+      .filter((c) => c.content)
+      .reduce((sum, c) => sum + countWords(c.content), 0)
+
+    const doneChapters = chapters.filter((c) => c.status === 'done').length
+    const totalChapters = chapters.length
+    const progress = totalChapters > 0 ? Math.round((doneChapters / totalChapters) * 100) : 0
+
+    // 今日新增字数
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    const todayStartTs = todayStart.getTime()
+    const todaySnaps = allSnapshots.filter((s) => s.createdAt >= todayStartTs)
+    const todayWords = todaySnaps.length > 0
+      ? todaySnaps[todaySnaps.length - 1].wordCount - todaySnaps[0].wordCount
+      : 0
+
+    // 连续写作天数
+    const dates = await getDailyWritingDates(id)
+    let streak = 0
+    const today = new Date()
+    for (let i = 0; i < dates.length; i++) {
+      const expected = new Date(today)
+      expected.setDate(today.getDate() - i)
+      const expectedStr = `${expected.getFullYear()}-${expected.getMonth() + 1}-${expected.getDate()}`
+      if (dates[i] === expectedStr) {
+        streak++
+      } else {
+        break
+      }
+    }
+
+    // 伏笔追踪
+    const openArcs = plotArcs.filter((a) => a.status === 'open').length
+    const resolvedArcs = plotArcs.filter((a) => a.status === 'resolved').length
+    const totalArcs = plotArcs.length
+
+    return { totalWords, doneChapters, totalChapters, progress, todayWords: Math.max(0, todayWords), streak, openArcs, resolvedArcs, totalArcs }
+  }
 
   const load = async () => {
     const p = await getProject(id)
@@ -44,6 +100,10 @@ export default function ProjectDashboard() {
     setCharacters(await getCharactersByProject(id))
     setChapters(await getChaptersByProject(id))
     setPlotArcs(await getPlotArcsByProject(id))
+    const st = await computeStats()
+    setStats(st)
+    const rels = await getCharacterRelations(id)
+    setCharacterRelations(rels)
   }
 
   useEffect(() => { load() }, [id, navigate])
@@ -94,6 +154,13 @@ export default function ProjectDashboard() {
     load()
   }
 
+  const handleAddRelation = async () => {
+    await saveCharacterRelation({ projectId: Number(id), ...relationForm })
+    setRelationForm({ fromCharId: 0, toCharId: 0, type: '师徒', description: '' })
+    setShowRelationForm(false)
+    load()
+  }
+
   const handleSaveWorld = async () => {
     await updateProject(id, worldForm)
     setProject({ ...project, ...worldForm })
@@ -122,7 +189,7 @@ export default function ProjectDashboard() {
     { key: 'overview', label: '总览' },
     { key: 'world', label: '世界观' },
     { key: 'characters', label: `人物 (${characters.length})` },
-    { key: 'plot', label: `剧情 (${plotArcs.length})` },
+
     { key: 'outline', label: `章节 (${chapters.length})` },
     { key: 'revision', label: '修订' },
   ]
@@ -217,6 +284,108 @@ export default function ProjectDashboard() {
               <div className="dash-stat-label">已完成</div>
             </div>
           </div>
+
+          {stats && (
+            <div className="card" style={{ marginTop: 20 }}>
+              <h3 className="card-section-title">写作统计</h3>
+              <div className="dash-stats-row">
+                <div className="dash-stat-card">
+                  <div className="dash-stat-num">{stats.totalWords.toLocaleString()}</div>
+                  <div className="dash-stat-label">总字数</div>
+                </div>
+                <div className="dash-stat-card">
+                  <div className="dash-stat-num">{stats.doneChapters}</div>
+                  <div className="dash-stat-label">已完成章节</div>
+                </div>
+                <div className="dash-stat-card">
+                  <div className="dash-stat-num">{stats.todayWords > 0 ? '+' + stats.todayWords.toLocaleString() : '—'}</div>
+                  <div className="dash-stat-label">今日新增字数</div>
+                </div>
+                <div className="dash-stat-card">
+                  <div className="dash-stat-num">{stats.streak || '—'}</div>
+                  <div className="dash-stat-label">连续写作天数</div>
+                </div>
+                <div className="dash-stat-card">
+                  <div className="dash-stat-num">{stats.progress}%</div>
+                  <div className="dash-stat-label">创作进度</div>
+                  <div className="progress-bar" style={{ marginTop: 6 }}>
+                    <div className="progress-bar-fill" style={{ width: stats.progress + '%' }} />
+                  </div>
+                </div>
+                <div className="dash-stat-card">
+                  <div className="dash-stat-num">{stats.totalArcs > 0 ? `${stats.resolvedArcs}/${stats.totalArcs}` : '—'}</div>
+                  <div className="dash-stat-label">伏笔追踪</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="card" style={{ marginTop: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h3 className="card-section-title">伏笔与冲突追踪</h3>
+              <button className="btn btn-primary btn-sm" onClick={() => setShowArcForm(!showArcForm)}>
+                + 添加
+              </button>
+            </div>
+
+            {showArcForm && (
+              <div style={{ marginBottom: 14, padding: '12px 14px', background: '#F4F2EC', borderRadius: 8 }}>
+                <div className="form-group">
+                  <label className="form-label">类型</label>
+                  <select className="form-select" value={arcForm.type} onChange={(e) => setArcForm({ ...arcForm, type: e.target.value })}>
+                    <option value="foreshadowing">伏笔</option>
+                    <option value="conflict">冲突</option>
+                    <option value="character_arc">角色弧</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">描述</label>
+                  <input className="form-input" value={arcForm.description} onChange={(e) => setArcForm({ ...arcForm, description: e.target.value })} placeholder="简要描述这个伏笔或冲突..." onKeyDown={(e) => e.key === 'Enter' && handleAddPlotArc()} />
+                </div>
+                <div className="btn-group" style={{ margin: 0 }}>
+                  <button className="btn btn-primary btn-sm" onClick={handleAddPlotArc} disabled={!arcForm.description.trim()}>添加</button>
+                  <button className="btn btn-secondary btn-sm" onClick={() => setShowArcForm(false)}>取消</button>
+                </div>
+              </div>
+            )}
+
+            {plotArcs.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 16 }}>
+                <p style={{ fontSize: 13, color: '#9A9A9A' }}>还没有伏笔或冲突，去总策划或章节策划对话中规划吧</p>
+              </div>
+            ) : (
+              plotArcs.map((arc) => (
+                <div key={arc.id} className="arc-row">
+                  <span className={`arc-type-tag arc-type-${arc.type}`}>
+                    {arc.type === 'foreshadowing' ? '伏笔' : arc.type === 'conflict' ? '冲突' : '角色弧'}
+                  </span>
+                  <span className="arc-desc">{arc.description}</span>
+                  <span className={`chapter-status ${arc.status === 'open' ? 'status-planned' : 'status-done'}`}>
+                    {arc.status === 'open' ? '未解决' : '已解决'}
+                  </span>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={async () => {
+                      await updatePlotArcStatus(arc.id, arc.status === 'open' ? 'resolved' : 'open')
+                      load()
+                    }}
+                  >
+                    {arc.status === 'open' ? '标记解决' : '重新打开'}
+                  </button>
+                  <button
+                    className="btn btn-danger btn-sm"
+                    onClick={async () => {
+                      await deletePlotArc(arc.id)
+                      load()
+                    }}
+                  >
+                    删除
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
         </div>
       )}
 
@@ -270,92 +439,6 @@ export default function ProjectDashboard() {
                 总策划对话
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Plot Tab */}
-      {tab === 'plot' && (
-        <div>
-          {project.synopsis && (
-            <div className="storyline-synopsis">
-              <div className="synopsis-label">主线概要</div>
-              {project.synopsis}
-            </div>
-          )}
-          {!project.synopsis && (
-            <div className="card" style={{ textAlign: 'center', padding: '24px 20px' }}>
-              <p style={{ fontSize: 13, color: '#9A9A9A', marginBottom: 10 }}>还没有主线概要，去剧情策划对话中确定吧</p>
-              <button className="btn btn-primary btn-sm" onClick={() => navigate(`/project/${id}/plot`)}>
-                去剧情策划
-              </button>
-            </div>
-          )}
-
-          <div className="card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <h3 className="card-section-title">伏笔与冲突追踪</h3>
-              <button className="btn btn-primary btn-sm" onClick={() => setShowArcForm(!showArcForm)}>
-                + 添加
-              </button>
-            </div>
-
-            {showArcForm && (
-              <div style={{ marginBottom: 14, padding: '12px 14px', background: '#F4F2EC', borderRadius: 8 }}>
-                <div className="form-group">
-                  <label className="form-label">类型</label>
-                  <select className="form-select" value={arcForm.type} onChange={(e) => setArcForm({ ...arcForm, type: e.target.value })}>
-                    <option value="foreshadowing">伏笔</option>
-                    <option value="conflict">冲突</option>
-                    <option value="character_arc">角色弧</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">描述</label>
-                  <input className="form-input" value={arcForm.description} onChange={(e) => setArcForm({ ...arcForm, description: e.target.value })} placeholder="简要描述这个伏笔或冲突..." onKeyDown={(e) => e.key === 'Enter' && handleAddPlotArc()} />
-                </div>
-                <div className="btn-group" style={{ margin: 0 }}>
-                  <button className="btn btn-primary btn-sm" onClick={handleAddPlotArc} disabled={!arcForm.description.trim()}>添加</button>
-                  <button className="btn btn-secondary btn-sm" onClick={() => setShowArcForm(false)}>取消</button>
-                </div>
-              </div>
-            )}
-
-            {plotArcs.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 16 }}>
-                <p style={{ fontSize: 13, color: '#9A9A9A' }}>还没有伏笔或冲突，去剧情策划对话中规划吧</p>
-              </div>
-            ) : (
-              plotArcs.map((arc) => (
-                <div key={arc.id} className="arc-row">
-                  <span className={`arc-type-tag arc-type-${arc.type}`}>
-                    {arc.type === 'foreshadowing' ? '伏笔' : arc.type === 'conflict' ? '冲突' : '角色弧'}
-                  </span>
-                  <span className="arc-desc">{arc.description}</span>
-                  <span className={`chapter-status ${arc.status === 'open' ? 'status-planned' : 'status-done'}`}>
-                    {arc.status === 'open' ? '未解决' : '已解决'}
-                  </span>
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={async () => {
-                      await updatePlotArcStatus(arc.id, arc.status === 'open' ? 'resolved' : 'open')
-                      load()
-                    }}
-                  >
-                    {arc.status === 'open' ? '标记解决' : '重新打开'}
-                  </button>
-                  <button
-                    className="btn btn-danger btn-sm"
-                    onClick={async () => {
-                      await deletePlotArc(arc.id)
-                      load()
-                    }}
-                  >
-                    删除
-                  </button>
-                </div>
-              ))
-            )}
           </div>
         </div>
       )}
@@ -715,6 +798,63 @@ export default function ProjectDashboard() {
               {characters.map((c) => (
                 <CharacterCard key={c.id} character={c} onDelete={handleDeleteCharacter} />
               ))}
+            </div>
+          )}
+
+          {/* 角色关系图谱 */}
+          {characters.length > 0 && (
+            <div className="card" style={{ marginTop: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <h3 className="card-section-title">角色关系图谱</h3>
+                <button className="btn btn-primary btn-sm" onClick={() => setShowRelationForm(!showRelationForm)}>
+                  + 添加关系
+                </button>
+              </div>
+
+              {showRelationForm && (
+                <div style={{ marginBottom: 12, padding: '12px 14px', background: '#F4F2EC', borderRadius: 8 }}>
+                  <div className="form-group">
+                    <label className="form-label">角色 A</label>
+                    <select className="form-select" value={relationForm.fromCharId} onChange={(e) => setRelationForm({ ...relationForm, fromCharId: Number(e.target.value) })}>
+                      <option value={0} disabled>选择角色</option>
+                      {characters.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">关系</label>
+                    <select className="form-select" value={relationForm.type} onChange={(e) => setRelationForm({ ...relationForm, type: e.target.value })}>
+                      {['师徒','敌对','爱慕','亲子','朋友','盟友','上下级','其他'].map((t) => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">角色 B</label>
+                    <select className="form-select" value={relationForm.toCharId} onChange={(e) => setRelationForm({ ...relationForm, toCharId: Number(e.target.value) })}>
+                      <option value={0} disabled>选择角色</option>
+                      {characters.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">描述（可选）</label>
+                    <input className="form-input" value={relationForm.description} onChange={(e) => setRelationForm({ ...relationForm, description: e.target.value })} placeholder="简述关系背景" />
+                  </div>
+                  <div className="btn-group" style={{ margin: 0 }}>
+                    <button className="btn btn-primary btn-sm" onClick={handleAddRelation} disabled={!relationForm.fromCharId || !relationForm.toCharId || relationForm.fromCharId === relationForm.toCharId}>添加</button>
+                    <button className="btn btn-secondary btn-sm" onClick={() => setShowRelationForm(false)}>取消</button>
+                  </div>
+                </div>
+              )}
+
+              {characterRelations.length > 0 ? (
+                <RelationGraph
+                  characters={characters}
+                  relations={characterRelations}
+                  height={520}
+                />
+              ) : (
+                <div className="empty-state" style={{ padding: 20 }}>
+                  <p style={{ fontSize: 13 }}>还没有角色关系，手动添加或通过 AI 对话自动生成</p>
+                </div>
+              )}
             </div>
           )}
         </div>

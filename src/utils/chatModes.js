@@ -102,6 +102,14 @@ ${charBlock}
   背景：剑宗唯一幸存者，背负灭门之仇
   [/CHARACTER]
 - 每个角色独立标签块，不要合并
+- 角色关系确认后，用 [RELATION]...[/RELATION] 标签标注
+  格式示例：
+  [RELATION]
+  角色A：林风
+  角色B：苏雪
+  关系：爱慕
+  描述：两人在玄天城相遇后互生好感
+  [/RELATION]
 - 需要选择时用 [OPTIONS]...[/OPTIONS] 提供选项
 - 不要涉及剧情规划，那有专门的入口
 - 用中文交流，不用 markdown 格式
@@ -111,45 +119,6 @@ ${charBlock}
     openingMessage: '',
     dataExtractor: () => null,
     extractCharacters: true,
-  },
-
-  plot: {
-    name: '剧情策划',
-    icon: '📜',
-    route: 'plot',
-    systemPrompt: (project, characters, chapters) => {
-      const charBlock = characters.length > 0
-        ? characters.map((c) => `- ${c.name}（${c.role}）：${c.traits || ''}；背景：${c.background || ''}`).join('\n')
-        : '（暂无）'
-
-      return `你是一位专业的小说剧情策划师，帮助用户规划故事主线。
-
-====== 已确认的设定 ======
-- 标题：${project.title || '未定'}
-- 题材：${project.genre || '未定'}
-- 世界观：${project.setting || '未定'}
-
-====== 已有人物 ======
-${charBlock}
-
-你的职责：
-1. 基于已有世界观和人物，规划主线剧情方向
-2. 提供2-3条主线方向供用户选择
-3. 确定核心冲突、关键转折点、高潮和结局
-4. 梳理故事的情感节奏
-
-规则：
-- 提出方向时用 [OPTIONS]...[/OPTIONS] 提供选项
-- 主线确定后用 [SYNOPSIS]...[/SYNOPSIS] 标签总结
-  格式：3-5句话概括完整的起承转合
-- 不要在这里规划具体章节结构，那有专门的入口
-- 用中文交流，不用 markdown 格式
-
-现在开始对话。先自我介绍（你是剧情策划师），然后基于已有设定提供2-3条主线方向供用户选择，用 [OPTIONS] 呈现。`
-    },
-    openingMessage: '',
-    dataExtractor: () => null,
-    extractSynopsis: true,
   },
 
   outline: {
@@ -297,6 +266,14 @@ ${writtenBlock}
 
 输出标签使用规则：
 - 确认角色设定后，用 [CHARACTER]...[/CHARACTER] 标签标注（格式同人物策划）
+- 角色关系确认后，用 [RELATION]...[/RELATION] 标签标注
+  格式示例：
+  [RELATION]
+  角色A：林风
+  角色B：苏雪
+  关系：爱慕
+  描述：两人在玄天城相遇后互生好感
+  [/RELATION]
 - 确定主线概要后，用 [SYNOPSIS]...[/SYNOPSIS] 标签总结
 - 确定章节计划后，用 [CHAPTERS]...[/CHAPTERS] 标签列出。格式："序号. 标题 —— 详细概要（至少40字，说清楚核心事件、出场人物、剧情推进）"
 - 确定世界观后，用以下格式输出确认信息（在回复末尾）：
