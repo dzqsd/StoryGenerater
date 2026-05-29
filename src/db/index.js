@@ -1,4 +1,5 @@
 import Dexie from 'dexie'
+import { countWords } from '../utils/wordCount'
 
 let db
 let dbAvailable = true
@@ -6,7 +7,7 @@ let dbAvailable = true
 try {
   db = new Dexie('StoryGenerater')
 
-  db.version(4).stores({
+  db.version(5).stores({
     projects: '++id, title, status, createdAt',
     characters: '++id, projectId, name',
     chapters: '++id, projectId, number, status',
@@ -14,6 +15,8 @@ try {
     settings: 'key',
     chapter_summaries: '++id, chapterId',
     plot_arcs: '++id, projectId, type, status',
+    version_snapshots: '++id, chapterId, createdAt',
+    character_relations: '++id, projectId, fromCharId, toCharId',
   })
 } catch (err) {
   console.error('IndexedDB 初始化失败:', err)
@@ -27,7 +30,18 @@ export function isDBAvailable() {
 
 // ====== Projects ======
 
-export async function createProject(title) {
+export const WORD_COUNT_OPTIONS = [
+  { value: '800-1200', label: '短篇 (800-1200字)', min: 800, target: 1000, max: 1200 },
+  { value: '1200-2000', label: '标准 (1200-2000字)', min: 1200, target: 1500, max: 2000 },
+  { value: '2000-3000', label: '中篇 (2000-3000字)', min: 2000, target: 2500, max: 3000 },
+  { value: '3000-5000', label: '长篇 (3000-5000字)', min: 3000, target: 4000, max: 5000 },
+]
+
+export function getWordCountConfig(value) {
+  return WORD_COUNT_OPTIONS.find((o) => o.value === value) || WORD_COUNT_OPTIONS[1]
+}
+
+export async function createProject(title, targetWordCount = '1200-2000') {
   const now = Date.now()
   const id = await db.projects.add({
     title,
@@ -36,6 +50,7 @@ export async function createProject(title) {
     synopsis: '',
     status: 'active',
     phase: 'planning',
+    targetWordCount,
     createdAt: now,
     updatedAt: now,
   })
@@ -84,10 +99,10 @@ export async function deleteCharacter(id) {
 
 export async function saveChapter(chapter) {
   if (chapter.id) {
-    await db.chapters.update(chapter.id, chapter)
+    await db.chapters.update(chapter.id, { ...chapter, updatedAt: Date.now() })
     return chapter.id
   }
-  return await db.chapters.add(chapter)
+  return await db.chapters.add({ ...chapter, createdAt: Date.now(), updatedAt: Date.now() })
 }
 
 export async function getChaptersByProject(projectId) {
@@ -101,7 +116,7 @@ export async function getChapter(id) {
 }
 
 export async function updateChapterContent(id, content, status) {
-  await db.chapters.update(Number(id), { content, status: status || 'draft' })
+  await db.chapters.update(Number(id), { content, status: status || 'draft', updatedAt: Date.now() })
 }
 
 export async function deleteChapter(id) {
@@ -202,6 +217,97 @@ export async function updatePlotArcStatus(id, status) {
 
 export async function deletePlotArc(id) {
   await db.plot_arcs.delete(Number(id))
+}
+
+// ====== Version Snapshots ======
+
+export async function createSnapshot(chapterId, content) {
+  const wordCount = countWords(content)
+  return await db.version_snapshots.add({
+    chapterId: Number(chapterId),
+    content,
+    wordCount,
+    createdAt: Date.now(),
+  })
+}
+
+export async function getSnapshotsByChapter(chapterId) {
+  return await db.version_snapshots
+    .where({ chapterId: Number(chapterId) })
+    .reverse()
+    .sortBy('createdAt')
+}
+
+export async function getSnapshot(id) {
+  return await db.version_snapshots.get(Number(id))
+}
+
+export async function deleteSnapshot(id) {
+  await db.version_snapshots.delete(Number(id))
+}
+
+export async function cleanupSnapshots(chapterId, maxCount = 20, maxAgeDays = 7) {
+  const all = await db.version_snapshots
+    .where({ chapterId: Number(chapterId) })
+    .sortBy('createdAt')
+  const cutoff = Date.now() - maxAgeDays * 86400000
+  const oldIds = all.filter((s) => s.createdAt < cutoff).map((s) => s.id)
+  const excessIds = all.length - maxCount > 0
+    ? all.slice(0, all.length - maxCount).map((s) => s.id)
+    : []
+  const toDelete = [...new Set([...oldIds, ...excessIds])]
+  for (const id of toDelete) {
+    await db.version_snapshots.delete(id)
+  }
+}
+
+export async function getDailyWritingDates(projectId) {
+  const chapters = await db.chapters
+    .where({ projectId: Number(projectId) })
+    .toArray()
+  const chapterIds = chapters.map((c) => c.id)
+  const allSnapshots = []
+  for (const cid of chapterIds) {
+    const snaps = await db.version_snapshots
+      .where({ chapterId: cid })
+      .toArray()
+    allSnapshots.push(...snaps)
+  }
+  const days = new Set()
+  for (const s of allSnapshots) {
+    const d = new Date(s.createdAt)
+    days.add(`${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`)
+  }
+  return Array.from(days).sort().reverse()
+}
+
+// ====== Character Relations ======
+
+export async function saveCharacterRelation(relation) {
+  const existing = await db.character_relations
+    .where({
+      projectId: Number(relation.projectId),
+      fromCharId: Number(relation.fromCharId),
+      toCharId: Number(relation.toCharId),
+      type: relation.type,
+    })
+    .first()
+  if (existing) return existing.id
+  if (relation.id) {
+    await db.character_relations.update(relation.id, relation)
+    return relation.id
+  }
+  return await db.character_relations.add(relation)
+}
+
+export async function getCharacterRelations(projectId) {
+  return await db.character_relations
+    .where({ projectId: Number(projectId) })
+    .toArray()
+}
+
+export async function deleteCharacterRelation(id) {
+  await db.character_relations.delete(Number(id))
 }
 
 export default db

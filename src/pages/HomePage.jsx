@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getAllProjects, createProject, deleteProject, getChaptersByProject } from '../db'
+import { getAllProjects, createProject, deleteProject, getChaptersByProject, WORD_COUNT_OPTIONS } from '../db'
 
 export default function HomePage() {
   const navigate = useNavigate()
   const [projects, setProjects] = useState([])
   const [showCreate, setShowCreate] = useState(false)
   const [title, setTitle] = useState('')
+  const [targetWordCount, setTargetWordCount] = useState('1200-2000')
   const [creating, setCreating] = useState(false)
   const [showGuide, setShowGuide] = useState(true)
 
@@ -32,8 +33,9 @@ export default function HomePage() {
   const handleCreate = async () => {
     if (!title.trim()) return
     setCreating(true)
-    const id = await createProject(title.trim())
+    const id = await createProject(title.trim(), targetWordCount)
     setTitle('')
+    setTargetWordCount('1200-2000')
     setShowCreate(false)
     setCreating(false)
     navigate(`/project/${id}/general`)
@@ -128,6 +130,18 @@ export default function HomePage() {
               onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
               autoFocus
             />
+          </div>
+          <div className="form-group">
+            <label className="form-label">每章目标字数</label>
+            <select
+              className="form-select"
+              value={targetWordCount}
+              onChange={(e) => setTargetWordCount(e.target.value)}
+            >
+              {WORD_COUNT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
           </div>
           <div className="btn-group">
             <button

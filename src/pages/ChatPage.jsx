@@ -6,6 +6,8 @@ import db, {
   getProjectConversation, saveProjectConversation,
   getSetting, saveCharacter, saveChapter,
   savePlotArc, saveCharacterRelation,
+  getAllChapterSummaries, getPlotArcsByProject,
+  getCharacterRelations,
 } from '../db'
 import { streamChat } from '../api/deepseek'
 import ChatMessage from '../components/ChatMessage'
@@ -106,6 +108,9 @@ export default function ChatPage({ mode: propMode }) {
   const projectRef = useRef(null)
   const charsRef = useRef([])
   const chapsRef = useRef([])
+  const summaryChainRef = useRef([])
+  const plotArcsRef = useRef([])
+  const relationsRef = useRef([])
   const _abortRef = useRef(null)
 
   useEffect(() => { messagesRef.current = messages }, [messages])
@@ -124,12 +129,18 @@ export default function ChatPage({ mode: propMode }) {
       const chars = await getCharactersByProject(id)
       const chaps = await getChaptersByProject(id)
       const conv = await getProjectConversation(id, mode)
+      const summaryChain = await getAllChapterSummaries(id)
+      const plotArcs = await getPlotArcsByProject(id)
+      const relations = await getCharacterRelations(id)
 
       if (cancelled) return
 
       projectRef.current = p
       charsRef.current = chars
       chapsRef.current = chaps
+      summaryChainRef.current = summaryChain
+      plotArcsRef.current = plotArcs
+      relationsRef.current = relations
       setProject(p)
       setCharacters(chars)
       setChapters(chaps)
@@ -178,6 +189,12 @@ export default function ChatPage({ mode: propMode }) {
     const chaps = await getChaptersByProject(id)
     setChapters(chaps)
     chapsRef.current = chaps
+    const summaryChain = await getAllChapterSummaries(id)
+    summaryChainRef.current = summaryChain
+    const plotArcs = await getPlotArcsByProject(id)
+    plotArcsRef.current = plotArcs
+    const relations = await getCharacterRelations(id)
+    relationsRef.current = relations
   }, [id])
 
   const initConversation = async (p, chars, chaps) => {
@@ -187,7 +204,16 @@ export default function ChatPage({ mode: propMode }) {
       return
     }
 
-    const systemPrompt = modeConfig.systemPrompt(p || projectRef.current, chars || [], chaps || [])
+    const systemPrompt = modeConfig.systemPrompt(
+      p || projectRef.current,
+      chars || [],
+      chaps || [],
+      {
+        chapterSummaries: summaryChainRef.current,
+        plotArcs: plotArcsRef.current,
+        characterRelations: relationsRef.current,
+      },
+    )
     const triggerMsg = { role: 'user', content: '你好，我们开始吧。', _internal: true }
     const msgs = [
       { role: 'system', content: systemPrompt },
@@ -244,7 +270,16 @@ export default function ChatPage({ mode: propMode }) {
 
     const p = projectRef.current
 
-    const systemPrompt = modeConfig.systemPrompt(p, charsRef.current, chapsRef.current)
+    const systemPrompt = modeConfig.systemPrompt(
+      p,
+      charsRef.current,
+      chapsRef.current,
+      {
+        chapterSummaries: summaryChainRef.current,
+        plotArcs: plotArcsRef.current,
+        characterRelations: relationsRef.current,
+      },
+    )
 
     let allMsgs = messagesRef.current
     if (allMsgs.length === 0 || allMsgs[0].role !== 'system') {
@@ -500,6 +535,13 @@ export default function ChatPage({ mode: propMode }) {
         )}
       </div>
 
+      {mode === 'outline' && (
+        <div className="quick-sends">
+          <button className="quick-send-btn" onClick={() => handleSend('再写一章')} disabled={streaming}>再写一章</button>
+          <button className="quick-send-btn" onClick={() => handleSend('再写两章')} disabled={streaming}>再写两章</button>
+          <button className="quick-send-btn" onClick={() => handleSend('再写三章')} disabled={streaming}>再写三章</button>
+        </div>
+      )}
       <div className="chat-input-area">
         <textarea
           className="chat-input"

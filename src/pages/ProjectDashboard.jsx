@@ -8,6 +8,7 @@ import {
   savePlotArc,
   getSnapshotsByChapter, getDailyWritingDates,
   saveCharacterRelation, getCharacterRelations,
+  WORD_COUNT_OPTIONS,
 } from '../db'
 import { countWords } from '../utils/wordCount'
 import CharacterCard from '../components/CharacterCard'
@@ -230,7 +231,7 @@ export default function ProjectDashboard() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <h3 className="card-section-title">项目信息</h3>
               <button className="btn btn-secondary btn-sm" onClick={() => {
-                setEditForm({ title: project.title, genre: project.genre, setting: project.setting, synopsis: project.synopsis })
+                setEditForm({ title: project.title, genre: project.genre, setting: project.setting, synopsis: project.synopsis, targetWordCount: project.targetWordCount || '1200-2000' })
                 setEditing(!editing)
               }}>
                 {editing ? '取消' : '编辑'}
@@ -254,6 +255,18 @@ export default function ProjectDashboard() {
                   <label className="form-label">主线概要</label>
                   <textarea className="form-input" rows={4} value={editForm.synopsis || ''} onChange={(e) => setEditForm({ ...editForm, synopsis: e.target.value })} />
                 </div>
+                <div className="form-group">
+                  <label className="form-label">每章目标字数</label>
+                  <select
+                    className="form-select"
+                    value={editForm.targetWordCount || '1200-2000'}
+                    onChange={(e) => setEditForm({ ...editForm, targetWordCount: e.target.value })}
+                  >
+                    {WORD_COUNT_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
                 <button className="btn btn-primary btn-sm" onClick={handleSaveEdit}>保存</button>
               </div>
             ) : (
@@ -262,6 +275,7 @@ export default function ProjectDashboard() {
                 <div className="info-item"><span className="info-label">状态</span><span className={`project-status status-${project.status}`}>{project.status === 'active' ? '创作中' : '已完成'}</span></div>
                 <div className="info-item"><span className="info-label">背景</span><span className="info-text">{project.setting || '未设定'}</span></div>
                 <div className="info-item"><span className="info-label">主线</span><span className="info-text">{project.synopsis || '未设定'}</span></div>
+                <div className="info-item"><span className="info-label">每章字数</span><span>{(WORD_COUNT_OPTIONS.find((o) => o.value === project.targetWordCount) || WORD_COUNT_OPTIONS[1]).label}</span></div>
               </div>
             )}
           </div>

@@ -3,14 +3,61 @@
  * Each mode has its own system prompt and data extraction logic.
  */
 
+// ====== Shared progress context builder ======
+
+function buildProgressBlock(chapterSummaries, plotArcs, characterRelations, characters) {
+  const writtenSummaries = chapterSummaries
+    .filter((s) => s.chapter.content)
+    .map((s) => {
+      let block = `第${s.chapter.number}章「${s.chapter.title || ''}」`
+      if (s.summary) {
+        block += `\n  概要：${s.summary.summary || s.chapter.summary || '无'}`
+        if (s.summary.characterChanges && s.summary.characterChanges !== '无') {
+          block += `\n  ⚡ 角色变化：${s.summary.characterChanges}`
+        }
+        if (s.summary.foreshadowing && s.summary.foreshadowing !== '无') {
+          block += `\n  📌 伏笔：${s.summary.foreshadowing}`
+        }
+      } else if (s.chapter.summary) {
+        block += `\n  概要：${s.chapter.summary}`
+      }
+      return block
+    })
+    .join('\n\n')
+
+  const arcsBlock = plotArcs.length > 0
+    ? plotArcs.map((a) => {
+        const typeLabel = a.type === 'foreshadowing' ? '伏笔' : a.type === 'conflict' ? '冲突' : '角色弧'
+        return `- [${typeLabel}] ${a.description}（${a.status === 'open' ? '未解决' : '已解决'}）`
+      }).join('\n')
+    : '暂无'
+
+  const relsBlock = characterRelations.length > 0
+    ? characterRelations.map((r) => {
+        const from = characters.find((c) => c.id === r.fromCharId)
+        const to = characters.find((c) => c.id === r.toCharId)
+        return `- ${from?.name || '?'} → ${to?.name || '?'}：${r.type}${r.description ? `（${r.description}）` : ''}`
+      }).join('\n')
+    : '暂无'
+
+  return { writtenBlock: writtenSummaries || '（暂无已写章节）', arcsBlock, relsBlock }
+}
+
 export const CHAT_MODES = {
   world: {
     name: '世界观策划',
     route: 'world',
-    systemPrompt: (project, characters, chapters) => {
+    systemPrompt: (project, characters, chapters, context) => {
       const charBlock = characters.length > 0
         ? characters.map((c) => `- ${c.name}（${c.role}）：${c.traits || ''}；背景：${c.background || ''}`).join('\n')
         : '（暂无）'
+
+      const { writtenBlock, arcsBlock, relsBlock } = buildProgressBlock(
+        context?.chapterSummaries || [],
+        context?.plotArcs || [],
+        context?.characterRelations || [],
+        characters,
+      )
 
       return `你是一位专业的小说世界观设计师，帮助用户构建故事的背景设定。
 
@@ -41,7 +88,16 @@ export const CHAT_MODES = {
 - 世界观：${project.setting || '未定'}
 
 ====== 已有人物 ======
-${charBlock}`
+${charBlock}
+
+====== 情节进度（已写章节摘要） ======
+${writtenBlock}
+
+====== 伏笔与冲突 ======
+${arcsBlock}
+
+====== 角色关系 ======
+${relsBlock}`
     },
     openingMessage: '',
     dataExtractor: (content, project) => {
@@ -71,10 +127,17 @@ ${charBlock}`
     name: '人物策划',
     icon: '👤',
     route: 'characters',
-    systemPrompt: (project, characters, chapters) => {
+    systemPrompt: (project, characters, chapters, context) => {
       const charBlock = characters.length > 0
         ? characters.map((c) => `- ${c.name}（${c.role}）：${c.traits || ''}；背景：${c.background || ''}`).join('\n')
         : '（暂无）'
+
+      const { writtenBlock, arcsBlock, relsBlock } = buildProgressBlock(
+        context?.chapterSummaries || [],
+        context?.plotArcs || [],
+        context?.characterRelations || [],
+        characters,
+      )
 
       return `你是一位专业的小说人物设计师，帮助用户塑造立体丰满的角色。
 
@@ -85,11 +148,21 @@ ${charBlock}`
 ====== 已有人物 ======
 ${charBlock}
 
+====== 情节进度（已写章节摘要） ======
+${writtenBlock}
+
+====== 伏笔与冲突 ======
+${arcsBlock}
+
+====== 角色关系 ======
+${relsBlock}
+
 你的职责：
 1. 帮助用户设计主角、配角、反派
 2. 每个角色明确：姓名、身份/定位、性格特点、背景故事
 3. 设计人物之间的关系网
 4. 考虑角色的成长弧光
+5. **重要：你必须根据「情节进度」了解人物当前状态。如果某角色已在已写章节中死亡/离开/变化，务必记住并在讨论中体现。**
 
 规则：
 - 一个一个角色来，设计完主角再设计配角
@@ -125,7 +198,7 @@ ${charBlock}
     name: '章节策划',
     icon: '📑',
     route: 'outline',
-    systemPrompt: (project, characters, chapters) => {
+    systemPrompt: (project, characters, chapters, context) => {
       const chapterList = chapters.length > 0
         ? chapters.map((c) => {
             let line = `第${c.number}章「${c.title || ''}」[${c.status}] ${c.summary || ''}`
@@ -137,6 +210,13 @@ ${charBlock}
       const charBlock = characters.length > 0
         ? characters.map((c) => `- ${c.name}（${c.role}）`).join('、')
         : '暂无'
+
+      const { writtenBlock, arcsBlock, relsBlock } = buildProgressBlock(
+        context?.chapterSummaries || [],
+        context?.plotArcs || [],
+        context?.characterRelations || [],
+        characters,
+      )
 
       return `你是一位专业的小说章节规划师，帮助用户规划详细的章节结构。
 
@@ -151,6 +231,15 @@ ${charBlock}
 
 ====== 现有章节 ======
 ${chapterList}
+
+====== 情节进度（已写章节详细摘要） ======
+${writtenBlock}
+
+====== 伏笔与冲突 ======
+${arcsBlock}
+
+====== 角色关系 ======
+${relsBlock}
 
 你的职责：
 1. 基于主线概要，规划章节结构（建议8-15章）
@@ -178,13 +267,20 @@ ${chapterList}
     name: '修订讨论',
     icon: '✏️',
     route: 'revision',
-    systemPrompt: (project, characters, chapters) => {
+    systemPrompt: (project, characters, chapters, context) => {
       const writtenChapters = chapters.filter((c) => c.content)
       const chapterList = writtenChapters.length > 0
         ? writtenChapters.map((c) =>
             `第${c.number}章「${c.title || ''}」\n  概要：${c.summary || '无'}\n  正文开头：${c.content.slice(0, 150).replace(/\n/g, ' ')}...\n  约${Math.round(c.content.length / 2)}字`
           ).join('\n\n')
         : '（暂无已写章节）'
+
+      const { writtenBlock, arcsBlock, relsBlock } = buildProgressBlock(
+        context?.chapterSummaries || [],
+        context?.plotArcs || [],
+        context?.characterRelations || [],
+        characters,
+      )
 
       return `你是一位专业的小说编辑，帮助用户修改和优化已写好的章节。
 
@@ -196,6 +292,15 @@ ${chapterList}
 
 ====== 已写章节 ======
 ${chapterList}
+
+====== 情节进度（章节摘要 + 角色变化） ======
+${writtenBlock}
+
+====== 伏笔与冲突 ======
+${arcsBlock}
+
+====== 角色关系 ======
+${relsBlock}
 
 你的职责：
 1. 听取用户对某一章的意见（节奏太慢、对话生硬、感情线弱等）
@@ -220,7 +325,7 @@ ${chapterList}
     name: '总策划',
     icon: '🎯',
     route: 'general',
-    systemPrompt: (project, characters, chapters) => {
+    systemPrompt: (project, characters, chapters, context) => {
       const charBlock = characters.length > 0
         ? characters.map((c) => `- ${c.name}（${c.role}）：${c.traits || ''}；背景：${c.background || ''}`).join('\n')
         : '（暂无）'
@@ -234,11 +339,18 @@ ${chapterList}
         : '（暂无）'
 
       const writtenChapters = chapters.filter((c) => c.content)
-      const writtenBlock = writtenChapters.length > 0
+      const writtenContentBlock = writtenChapters.length > 0
         ? writtenChapters.map((c) =>
             `第${c.number}章「${c.title || ''}」正文开头：${c.content.slice(0, 150).replace(/\n/g, ' ')}...`
           ).join('\n')
         : '（暂无已写章节）'
+
+      const { writtenBlock, arcsBlock, relsBlock } = buildProgressBlock(
+        context?.chapterSummaries || [],
+        context?.plotArcs || [],
+        context?.characterRelations || [],
+        characters,
+      )
 
       return `你是「总策划」——一位全能的小说创作顾问。你精通世界观设计、人物塑造、剧情规划、章节编排和内容修订等所有创作环节。
 
@@ -257,7 +369,16 @@ ${charBlock}
 ${chapterList}
 
 ====== 已写章节（供修订参考） ======
+${writtenContentBlock}
+
+====== 情节进度（章节摘要 + 角色变化 + 伏笔） ======
 ${writtenBlock}
+
+====== 伏笔与冲突 ======
+${arcsBlock}
+
+====== 角色关系 ======
+${relsBlock}
 
 你的职责：
 1. 回答用户关于小说创作的任何问题

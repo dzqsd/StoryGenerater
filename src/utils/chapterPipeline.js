@@ -3,7 +3,8 @@
  * Shared by single-chapter and batch generation modes.
  */
 import { streamChat } from '../api/deepseek'
-import { saveChapterSummary, savePlotArc } from '../db'
+import { saveChapterSummary, savePlotArc, saveChapter } from '../db'
+import { countWords } from './wordCount'
 import {
   buildDetailedOutlinePrompt,
   buildDraftPrompt,
@@ -30,6 +31,7 @@ function buildFullChain(chapters, summaryChain) {
  * @param {Array}  params.summaryChain      - from getAllChapterSummaries()
  * @param {Object} params.targetChapter     - { id, number, title, summary }
  * @param {Array}  params.plotArcs          - from getOpenPlotArcs()
+ * @param {Object} params.wordCount         - { min, target, max }
  * @param {string} params.apiKey
  * @param {(stage: string) => void}  params.onStageChange
  * @param {(stage: string, text: string) => void} params.onOutput
@@ -43,19 +45,21 @@ export async function runChapterPipeline({
   summaryChain,
   targetChapter,
   plotArcs,
+  wordCount,
   apiKey,
   onStageChange,
   onOutput,
   signal,
 }) {
   const fullChain = buildFullChain(chapters, summaryChain)
+  const totalWordCount = chapters.reduce((sum, c) => sum + countWords(c.content || ''), 0)
   const checkAbort = () => {
     if (signal?.aborted) throw new Error('已中止')
   }
 
   // --- Stage 1: Detailed Outline ---
   onStageChange('outline')
-  const outlinePrompt = buildDetailedOutlinePrompt(project, characters, fullChain, targetChapter)
+  const outlinePrompt = buildDetailedOutlinePrompt(project, characters, fullChain, targetChapter, totalWordCount)
   let outlineText = ''
   checkAbort()
   await streamChat(
@@ -82,7 +86,7 @@ export async function runChapterPipeline({
 
   // --- Stage 2: Draft ---
   onStageChange('draft')
-  const draftPrompt = buildDraftPrompt(project, characters, fullChain, targetChapter, outlineText)
+  const draftPrompt = buildDraftPrompt(project, characters, fullChain, targetChapter, outlineText, wordCount, totalWordCount)
   let draftText = ''
   checkAbort()
   await streamChat(
@@ -109,7 +113,7 @@ export async function runChapterPipeline({
 
   // --- Stage 3: Consistency Review ---
   onStageChange('review')
-  const reviewPrompt = buildConsistencyReviewPrompt(project, characters, fullChain, targetChapter, draftText, plotArcs)
+  const reviewPrompt = buildConsistencyReviewPrompt(project, characters, fullChain, targetChapter, draftText, plotArcs, totalWordCount)
   let reviewText = ''
   checkAbort()
   try {
@@ -142,7 +146,7 @@ export async function runChapterPipeline({
 
   // --- Stage 4: Polish ---
   onStageChange('polish')
-  const polishPrompt = buildPolishPrompt(draftText, reviewText)
+  const polishPrompt = buildPolishPrompt(draftText, reviewText, wordCount)
   let finalText = ''
   checkAbort()
   try {
@@ -216,6 +220,8 @@ export async function extractAndSaveSummary(chapter, content, project, apiKey) {
 
     if (parsed) {
       await saveChapterSummary(chapter.id, parsed)
+      // Always overwrite the flag on the chapter record
+      await saveChapter({ id: chapter.id, isKeyChapter: parsed.isKeyChapter || false, keyReason: parsed.isKeyChapter ? (parsed.keyReason || '') : '' })
       if (parsed.foreshadowing && parsed.foreshadowing !== '无') {
         await savePlotArc({
           projectId: Number(project.id),
@@ -229,4 +235,63 @@ export async function extractAndSaveSummary(chapter, content, project, apiKey) {
   } catch {
     // Summary extraction is non-blocking
   }
+}
+
+/**
+ * Re-analyze all written chapters to detect key chapters and update summaries.
+ * Useful for retroactively marking existing chapters after the key-chapter feature is added.
+ *
+ * @param {Array}   chapters - all chapter records
+ * @param {Object}  project  - project record
+ * @param {string}  apiKey
+ * @param {(current: number, total: number, title: string) => void} onProgress
+ * @returns {Promise<{analyzed: number, keyChapters: number, errors: number}>}
+ */
+export async function reanalyzeAllChapters(chapters, project, apiKey, onProgress) {
+  const written = chapters.filter((c) => c.content)
+  let analyzed = 0
+  let keyChapters = 0
+  let errors = 0
+
+  for (const ch of written) {
+    try {
+      onProgress(analyzed + 1, written.length, ch.title || `第${ch.number}章`)
+      const summaryPrompt = buildChapterSummaryPrompt(project, ch, ch.content)
+      const summaryMessages = [
+        { role: 'system', content: '你是小说分析助手，始终返回严格 JSON，不要加额外文字。' },
+        { role: 'user', content: summaryPrompt },
+      ]
+
+      const resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'deepseek-v4-flash',
+          messages: summaryMessages,
+          temperature: 0.3,
+          max_tokens: 1024,
+          stream: false,
+        }),
+      })
+
+      const data = await resp.json()
+      const raw = data.choices?.[0]?.message?.content || ''
+      const parsed = parseChapterSummaryJSON(raw)
+
+      if (parsed) {
+        await saveChapterSummary(ch.id, parsed)
+        // Always overwrite the flag — clears previously-marked chapters that no longer qualify
+        await saveChapter({ id: ch.id, isKeyChapter: parsed.isKeyChapter || false, keyReason: parsed.isKeyChapter ? (parsed.keyReason || '') : '' })
+        if (parsed.isKeyChapter) keyChapters++
+        analyzed++
+      }
+    } catch {
+      errors++
+    }
+  }
+
+  return { analyzed, keyChapters, errors }
 }
